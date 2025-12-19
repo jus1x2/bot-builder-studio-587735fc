@@ -445,8 +445,24 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
                 type="number"
                 min={2}
                 max={10}
-                value={randomOutcomeCount}
-                onChange={(e) => updateConfig('outcomeCount', Math.max(2, Math.min(10, Number(e.target.value))))}
+                value={actionNode.config.outcomeCount ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    updateConfig('outcomeCount', '');
+                  } else {
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num)) {
+                      updateConfig('outcomeCount', Math.max(2, Math.min(10, num)));
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  const current = actionNode.config.outcomeCount;
+                  if (current === '' || current === undefined || isNaN(Number(current))) {
+                    updateConfig('outcomeCount', 2);
+                  }
+                }}
                 className="telegram-input"
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -486,6 +502,132 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
               <p className="text-xs text-muted-foreground mt-1">
                 Сохраняет номер выбранного исхода (0, 1, 2...)
               </p>
+            </div>
+          </div>
+        );
+
+      case 'weighted_random':
+        const weightedOutcomes = actionNode.config.outcomes || [
+          { id: 'outcome-0', weight: 50, label: '' },
+          { id: 'outcome-1', weight: 50, label: '' },
+        ];
+        const totalWeight = weightedOutcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0);
+        const weightedOutcomeCount = weightedOutcomes.length;
+        
+        return (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/30">
+              <p className="text-sm font-medium text-orange-700 dark:text-orange-300 mb-1">
+                Взвешенный случайный выбор
+              </p>
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                Укажите процент для каждого исхода. Проценты автоматически нормализуются.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Количество исходов
+              </label>
+              <Input
+                type="number"
+                min={2}
+                max={10}
+                value={weightedOutcomeCount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') return;
+                  const newCount = Math.max(2, Math.min(10, parseInt(val, 10) || 2));
+                  let updated = [...weightedOutcomes];
+                  
+                  if (newCount > updated.length) {
+                    const remainingPercent = 100 - updated.reduce((s: number, o: any) => s + (o.weight || 0), 0);
+                    const newWeight = Math.max(10, Math.round(remainingPercent / (newCount - updated.length)));
+                    for (let i = updated.length; i < newCount; i++) {
+                      updated.push({ id: `outcome-${i}`, weight: newWeight, label: '' });
+                    }
+                  } else if (newCount < updated.length) {
+                    updated = updated.slice(0, newCount);
+                  }
+                  updateConfig('outcomes', updated);
+                }}
+                className="telegram-input"
+              />
+            </div>
+
+            <div className="space-y-3">
+              {weightedOutcomes.map((outcome: any, index: number) => {
+                const percent = totalWeight > 0 ? Math.round((outcome.weight / totalWeight) * 100) : 0;
+                return (
+                  <div key={outcome.id || index} className="p-3 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-foreground">Исход {index + 1}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Итоговый: <span className="font-medium text-orange-600 dark:text-orange-400">{percent}%</span>
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={outcome.label || ''}
+                        onChange={(e) => {
+                          const updated = [...weightedOutcomes];
+                          updated[index] = { ...updated[index], label: e.target.value };
+                          updateConfig('outcomes', updated);
+                        }}
+                        placeholder={`Название исхода ${index + 1}`}
+                        className="telegram-input flex-1"
+                      />
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={outcome.weight || 50}
+                        onChange={(e) => {
+                          const updated = [...weightedOutcomes];
+                          updated[index] = { ...updated[index], weight: Math.max(1, Math.min(100, Number(e.target.value) || 1)) };
+                          updateConfig('outcomes', updated);
+                        }}
+                        className="telegram-input w-20"
+                      />
+                      <span className="flex items-center text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Visual distribution bar */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Распределение вероятностей
+              </label>
+              <div className="h-6 rounded-lg overflow-hidden flex">
+                {weightedOutcomes.map((outcome: any, index: number) => {
+                  const percent = totalWeight > 0 ? (outcome.weight / totalWeight) * 100 : 0;
+                  const colors = ['bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
+                  return (
+                    <div
+                      key={outcome.id || index}
+                      className={`${colors[index % colors.length]} flex items-center justify-center text-xs font-medium text-white`}
+                      style={{ width: `${percent}%` }}
+                    >
+                      {percent >= 10 && `${Math.round(percent)}%`}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сохранить индекс результата в поле
+              </label>
+              <Input
+                value={actionNode.config.saveToField || ''}
+                onChange={(e) => updateConfig('saveToField', e.target.value)}
+                placeholder="user.weighted_outcome"
+                className="telegram-input"
+              />
             </div>
           </div>
         );

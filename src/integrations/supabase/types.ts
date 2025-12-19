@@ -124,6 +124,7 @@ export type Database = {
           description: string | null
           id: string
           keyword_triggers: string[] | null
+          media_url: string | null
           menu_order: number | null
           message_text: string
           name: string
@@ -139,6 +140,7 @@ export type Database = {
           description?: string | null
           id?: string
           keyword_triggers?: string[] | null
+          media_url?: string | null
           menu_order?: number | null
           message_text?: string
           name: string
@@ -154,6 +156,7 @@ export type Database = {
           description?: string | null
           id?: string
           keyword_triggers?: string[] | null
+          media_url?: string | null
           menu_order?: number | null
           message_text?: string
           name?: string

@@ -83,6 +83,7 @@ export interface BotMenu {
   name: string;
   description?: string;
   messageText: string;
+  mediaUrl?: string;
   buttons: BotButton[];
   parentId?: string;
   order: number;

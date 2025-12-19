@@ -858,34 +858,73 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
         );
 
       case 'schedule_message':
+        const delaySeconds = actionNode.config.delay || 5;
+        const formatTime = (seconds: number) => {
+          if (seconds < 60) return `${seconds} сек`;
+          if (seconds < 3600) return `${Math.floor(seconds / 60)} мин ${seconds % 60} сек`;
+          return `${Math.floor(seconds / 3600)} ч ${Math.floor((seconds % 3600) / 60)} мин`;
+        };
+        
         return (
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Отправить через (секунды)
-              </label>
-              <Input
-                type="number"
-                min={60}
-                value={actionNode.config.delay || 3600}
-                onChange={(e) => updateConfig('delay', Number(e.target.value))}
-                className="telegram-input"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {Math.floor((actionNode.config.delay || 3600) / 3600)} ч {Math.floor(((actionNode.config.delay || 3600) % 3600) / 60)} мин
+            <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/30">
+              <p className="text-sm font-medium text-violet-700 dark:text-violet-300 mb-1">
+                ⏱️ Таймер
+              </p>
+              <p className="text-xs text-violet-600 dark:text-violet-400">
+                Через указанное время выполнит следующий подключённый узел (меню или действие)
               </p>
             </div>
+
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
-                Сообщение
+                Задержка
               </label>
-              <Textarea
-                value={actionNode.config.message || ''}
-                onChange={(e) => updateConfig('message', e.target.value)}
-                placeholder="Текст отложенного сообщения..."
-                rows={3}
-                className="telegram-input resize-none"
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={delaySeconds}
+                  onChange={(e) => updateConfig('delay', Math.max(1, Number(e.target.value)))}
+                  className="telegram-input flex-1"
+                />
+                <Select
+                  value={actionNode.config.delayUnit || 'seconds'}
+                  onValueChange={(value) => updateConfig('delayUnit', value)}
+                >
+                  <SelectTrigger className="telegram-input w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="seconds">секунд</SelectItem>
+                    <SelectItem value="minutes">минут</SelectItem>
+                    <SelectItem value="hours">часов</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Итого: <span className="font-medium">{formatTime(
+                  actionNode.config.delayUnit === 'minutes' ? delaySeconds * 60 :
+                  actionNode.config.delayUnit === 'hours' ? delaySeconds * 3600 :
+                  delaySeconds
+                )}</span>
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Показывать "печатает..." во время ожидания
+              </label>
+              <Switch
+                checked={actionNode.config.showTyping || false}
+                onCheckedChange={(checked) => updateConfig('showTyping', checked)}
               />
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-xs text-muted-foreground">
+                💡 Подключите к следующему узлу на канвасе — меню или действие, которое выполнится после таймера
+              </p>
             </div>
           </div>
         );

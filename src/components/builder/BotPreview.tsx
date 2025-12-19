@@ -343,6 +343,37 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         }
         break;
       }
+      case 'schedule_message': {
+        // Timer action - wait for configured delay then continue to next node
+        const delay = actionNode.config.delay || 5;
+        const unit = actionNode.config.delayUnit || 'seconds';
+        const delayMs = (
+          unit === 'minutes' ? delay * 60 * 1000 :
+          unit === 'hours' ? delay * 60 * 60 * 1000 :
+          delay * 1000
+        );
+        
+        // In preview, limit to max 5 seconds for demo purposes
+        const previewDelay = Math.min(delayMs, 5000);
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `⏱️ Таймер: ожидание ${delay} ${unit === 'minutes' ? 'мин' : unit === 'hours' ? 'ч' : 'сек'}...`, 
+          type: 'bot' 
+        }]);
+        
+        if (actionNode.config.showTyping) setIsTypingIndicator(true);
+        await new Promise(resolve => setTimeout(resolve, previewDelay));
+        if (actionNode.config.showTyping) setIsTypingIndicator(false);
+        
+        // Continue to next connected node
+        if (actionNode.nextNodeType === 'menu' && actionNode.nextNodeId) {
+          return { navigateMenuId: actionNode.nextNodeId };
+        } else if (actionNode.nextNodeType === 'action' && actionNode.nextNodeId) {
+          return { navigateMenuId: null, nextActionId: actionNode.nextNodeId };
+        }
+        break;
+      }
     }
     return { navigateMenuId: null };
   }, [userContext]);

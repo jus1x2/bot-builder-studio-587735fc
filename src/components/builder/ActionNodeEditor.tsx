@@ -2078,6 +2078,22 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сообщение при исчерпании лимита
+              </label>
+              <Textarea
+                value={actionNode.config.limitExceededMessage || '🚫 Вы исчерпали лимит ({maxActions} действий за {period}). Попробуйте позже.'}
+                onChange={(e) => updateConfig('limitExceededMessage', e.target.value)}
+                placeholder="🚫 Лимит исчерпан..."
+                rows={2}
+                className="telegram-input resize-none"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Переменные: <code className="bg-muted px-1 rounded">{'{maxActions}'}</code> — лимит, <code className="bg-muted px-1 rounded">{'{period}'}</code> — период
+              </p>
+            </div>
+
             <div className="p-3 rounded-lg bg-muted/50 border border-border">
               <p className="text-xs text-muted-foreground">
                 ⚡ Если лимит превышен, пользователь не сможет выполнить действие до истечения периода

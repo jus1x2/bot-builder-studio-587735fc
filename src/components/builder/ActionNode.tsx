@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position, type Node } from '@xyflow/react';
 import { motion } from 'framer-motion';
-import { Trash2, Settings, Copy, icons, Package, ShoppingCart, CreditCard, Wallet } from 'lucide-react';
+import { Trash2, Settings, Copy, icons, Package, ShoppingCart, CreditCard, Wallet, Plus } from 'lucide-react';
 import { BotActionNode, ACTION_INFO } from '@/types/bot';
 
 export interface ActionNodeData extends Record<string, unknown> {
@@ -50,6 +50,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       case 'show_product':
       case 'show_cart':
       case 'process_payment':
+      case 'add_to_cart':
         return null; // Will use custom preview
       default:
         return actionInfo?.description || '';
@@ -78,7 +79,8 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
   const isShowProduct = actionNode.type === 'show_product';
   const isShowCart = actionNode.type === 'show_cart';
   const isProcessPayment = actionNode.type === 'process_payment';
-  const hasCustomPreview = isShowProduct || isShowCart || isProcessPayment;
+  const isAddToCart = actionNode.type === 'add_to_cart';
+  const hasCustomPreview = isShowProduct || isShowCart || isProcessPayment || isAddToCart;
 
   // Product preview component for show_product action
   const renderProductPreview = () => {
@@ -256,6 +258,53 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
+  // Add to cart preview component
+  const renderAddToCartPreview = () => {
+    if (!isAddToCart) return null;
+    
+    const { productId, productName, quantity, price } = actionNode.config;
+    const hasContent = productId || productName;
+    
+    if (!hasContent) {
+      return (
+        <div className="mt-2 p-2 bg-white/50 dark:bg-black/20 rounded-lg border border-dashed border-current/30 text-center">
+          <Plus className="w-5 h-5 mx-auto mb-1 opacity-50" />
+          <p className="text-[9px] opacity-60">Настройте товар</p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="mt-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+        <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-800/30 flex items-center gap-1.5">
+          <Plus className="w-3 h-3 text-emerald-600" />
+          <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">Добавление в корзину</span>
+        </div>
+        
+        <div className="p-2 flex items-center gap-2">
+          <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded flex items-center justify-center flex-shrink-0">
+            <Package className="w-4 h-4 text-emerald-500/60" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-medium text-gray-900 dark:text-gray-100 truncate">
+              {productName || productId || 'Товар'}
+            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[9px] text-gray-500">
+                Кол-во: <span className="font-medium text-gray-700 dark:text-gray-300">{quantity || 1}</span>
+              </span>
+              {price !== undefined && price !== null && (
+                <span className="text-[9px] font-medium text-emerald-600">
+                  {Number(price).toLocaleString('ru-RU')} ₽
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
@@ -313,6 +362,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       {renderProductPreview()}
       {renderCartPreview()}
       {renderPaymentPreview()}
+      {renderAddToCartPreview()}
 
       <Handle
         type="source"

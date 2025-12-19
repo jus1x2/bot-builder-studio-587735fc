@@ -673,23 +673,42 @@ export const useProjectStore = create<ProjectStore>()(
 
         // Initialize outcomes for multi-output actions
         const isMultiOutput = type === 'random_result' || type === 'weighted_random';
+        const isLottery = type === 'lottery';
+        const isIfElse = type === 'if_else';
         const defaultOutcomeCount = 2;
+
+        let outcomes: { id: string }[] | undefined;
+        let config: Record<string, any> = {};
+
+        if (isMultiOutput) {
+          outcomes = Array.from({ length: defaultOutcomeCount }, () => ({ id: uuidv4() }));
+          config = type === 'random_result' 
+            ? { outcomeCount: defaultOutcomeCount } 
+            : { outcomes: [
+                { id: uuidv4(), weight: 50, label: '' },
+                { id: uuidv4(), weight: 50, label: '' },
+              ] };
+        } else if (isLottery) {
+          // Lottery has 2 outcomes: win and lose
+          outcomes = [
+            { id: uuidv4() }, // win
+            { id: uuidv4() }, // lose
+          ];
+          config = { winChance: 10 };
+        } else if (isIfElse) {
+          // If/else has 2 outcomes: yes and no
+          outcomes = [
+            { id: 'yes' },
+            { id: 'no' },
+          ];
+        }
 
         const actionNode: BotActionNode = {
           id: uuidv4(),
           type,
-          config: type === 'random_result' 
-            ? { outcomeCount: defaultOutcomeCount } 
-            : type === 'weighted_random'
-              ? { outcomes: [
-                  { id: uuidv4(), weight: 50, label: '' },
-                  { id: uuidv4(), weight: 50, label: '' },
-                ] }
-              : {},
+          config,
           position,
-          outcomes: isMultiOutput
-            ? Array.from({ length: defaultOutcomeCount }, () => ({ id: uuidv4() }))
-            : undefined,
+          outcomes,
         };
 
         set((state) => ({

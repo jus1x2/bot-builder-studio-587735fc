@@ -149,7 +149,7 @@ export function PurchaseRequestModal({ isOpen, onClose }: PurchaseRequestModalPr
                   <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
                     <p className="text-sm font-medium text-foreground">{project.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {project.menus.length} экранов • {project.menus.reduce((acc, m) => acc + m.buttons.length, 0)} кнопок
+                      {project.menus.length} экранов • {project.menus.reduce((acc, m) => acc + m.buttons.length, 0)} кнопок • {(project.actionNodes || []).length} действий
                     </p>
                   </div>
                 )}

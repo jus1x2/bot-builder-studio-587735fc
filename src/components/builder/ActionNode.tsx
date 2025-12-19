@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position, type Node } from '@xyflow/react';
 import { motion } from 'framer-motion';
-import { Trash2, Settings, Copy, icons, Package, ShoppingCart } from 'lucide-react';
+import { Trash2, Settings, Copy, icons, Package, ShoppingCart, CreditCard, Wallet } from 'lucide-react';
 import { BotActionNode, ACTION_INFO } from '@/types/bot';
 
 export interface ActionNodeData extends Record<string, unknown> {
@@ -48,6 +48,8 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       case 'navigate_menu':
         return 'Переход в меню';
       case 'show_product':
+      case 'show_cart':
+      case 'process_payment':
         return null; // Will use custom preview
       default:
         return actionInfo?.description || '';
@@ -74,6 +76,9 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
   const colorClasses = getNodeColor();
   const configPreview = getConfigPreview();
   const isShowProduct = actionNode.type === 'show_product';
+  const isShowCart = actionNode.type === 'show_cart';
+  const isProcessPayment = actionNode.type === 'process_payment';
+  const hasCustomPreview = isShowProduct || isShowCart || isProcessPayment;
 
   // Product preview component for show_product action
   const renderProductPreview = () => {
@@ -141,6 +146,116 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
+  // Cart preview component for show_cart action
+  const renderCartPreview = () => {
+    if (!isShowCart) return null;
+    
+    const { emptyCartMessage, showTotal } = actionNode.config;
+    
+    return (
+      <div className="mt-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+        <div className="p-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1.5">
+          <ShoppingCart className="w-3 h-3 text-emerald-500" />
+          <span className="text-[10px] font-medium text-gray-900 dark:text-gray-100">Корзина</span>
+        </div>
+        
+        {/* Mock cart items */}
+        <div className="p-1.5 space-y-1">
+          <div className="flex items-center gap-1.5 p-1 bg-gray-50 dark:bg-gray-800 rounded">
+            <div className="w-6 h-6 bg-emerald-100 dark:bg-emerald-900/30 rounded flex items-center justify-center">
+              <Package className="w-3 h-3 text-emerald-500/60" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[8px] text-gray-600 dark:text-gray-400 truncate">Товар 1</p>
+              <p className="text-[9px] font-medium text-gray-900 dark:text-gray-100">1 × 990 ₽</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 p-1 bg-gray-50 dark:bg-gray-800 rounded">
+            <div className="w-6 h-6 bg-emerald-100 dark:bg-emerald-900/30 rounded flex items-center justify-center">
+              <Package className="w-3 h-3 text-emerald-500/60" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[8px] text-gray-600 dark:text-gray-400 truncate">Товар 2</p>
+              <p className="text-[9px] font-medium text-gray-900 dark:text-gray-100">2 × 450 ₽</p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Total */}
+        {showTotal !== false && (
+          <div className="p-1.5 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
+            <span className="text-[9px] text-gray-500">Итого:</span>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">1 890 ₽</span>
+          </div>
+        )}
+        
+        {emptyCartMessage && (
+          <p className="text-[8px] text-gray-400 px-1.5 pb-1 truncate">
+            Пусто: {emptyCartMessage.slice(0, 20)}...
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  // Payment preview component for process_payment action
+  const renderPaymentPreview = () => {
+    if (!isProcessPayment) return null;
+    
+    const { provider, amount, currency, successMessage } = actionNode.config;
+    
+    const providerLabels: Record<string, { name: string; color: string }> = {
+      yookassa: { name: 'ЮKassa', color: 'bg-blue-500' },
+      tinkoff: { name: 'Тинькофф', color: 'bg-yellow-500' },
+      sberbank: { name: 'СберПэй', color: 'bg-green-500' },
+      robokassa: { name: 'Robokassa', color: 'bg-orange-500' },
+      telegram_stars: { name: 'Telegram Stars', color: 'bg-indigo-500' },
+    };
+    
+    const providerInfo = providerLabels[provider] || { name: 'Оплата', color: 'bg-gray-500' };
+    
+    return (
+      <div className="mt-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+        {/* Provider header */}
+        <div className={`p-2 ${providerInfo.color} text-white flex items-center gap-1.5`}>
+          <CreditCard className="w-3.5 h-3.5" />
+          <span className="text-[10px] font-medium">{providerInfo.name}</span>
+        </div>
+        
+        {/* Payment details */}
+        <div className="p-2 space-y-1.5">
+          {amount !== undefined && amount !== null && (
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] text-gray-500">К оплате:</span>
+              <span className="text-[12px] font-bold text-gray-900 dark:text-gray-100">
+                {Number(amount).toLocaleString('ru-RU')} {currency || '₽'}
+              </span>
+            </div>
+          )}
+          
+          {!amount && (
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] text-gray-500">К оплате:</span>
+              <span className="text-[10px] text-gray-400">Сумма корзины</span>
+            </div>
+          )}
+          
+          {/* Pay button */}
+          <button className={`w-full py-1.5 ${providerInfo.color} text-white rounded text-[9px] font-medium flex items-center justify-center gap-1`}>
+            <Wallet className="w-3 h-3" />
+            Оплатить
+          </button>
+          
+          {successMessage && (
+            <p className="text-[8px] text-green-600 dark:text-green-400 truncate">
+              ✓ {successMessage.slice(0, 25)}...
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
@@ -148,7 +263,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       className={`action-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-all ${colorClasses} ${
         isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
       }`}
-      style={{ minWidth: isShowProduct ? 200 : 180, maxWidth: isShowProduct ? 240 : 220 }}
+      style={{ minWidth: hasCustomPreview ? 200 : 180, maxWidth: hasCustomPreview ? 240 : 220 }}
     >
       <Handle
         type="target"
@@ -196,6 +311,8 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       )}
 
       {renderProductPreview()}
+      {renderCartPreview()}
+      {renderPaymentPreview()}
 
       <Handle
         type="source"

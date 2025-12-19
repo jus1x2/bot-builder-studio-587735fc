@@ -1,96 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Telegram Mini App specific styles */
+:root {
+  --tg-theme-bg-color: hsl(220 20% 97%);
+  --tg-theme-text-color: hsl(220 20% 10%);
+  --tg-theme-hint-color: hsl(220 10% 45%);
+  --tg-theme-link-color: hsl(200 100% 40%);
+  --tg-theme-button-color: hsl(200 100% 40%);
+  --tg-theme-button-text-color: hsl(0 0% 100%);
+  --tg-viewport-height: 100vh;
+  --tg-viewport-stable-height: 100vh;
+}
+
+/* Use Telegram theme colors when available */
+html.tg-theme {
+  --background: var(--tg-theme-bg-color);
+  --foreground: var(--tg-theme-text-color);
+  --primary: var(--tg-theme-button-color);
+}
+
+/* Mobile optimizations */
+@supports (height: 100dvh) {
+  :root {
+    --tg-viewport-height: 100dvh;
+    --tg-viewport-stable-height: 100dvh;
+  }
+}
+
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: manipulation;
+}
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Background & Foreground */
+    --background: 220 20% 97%;
+    --foreground: 220 20% 10%;
 
+    /* Card */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 20% 10%;
 
+    /* Popover */
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 20% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary (Telegram Blue) */
+    --primary: 200 100% 40%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary */
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 20% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted */
+    --muted: 220 15% 95%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent */
+    --accent: 200 100% 45%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructive */
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Border & Input */
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
+    --ring: 200 100% 40%;
+    --radius: 0.75rem;
 
-    --radius: 0.5rem;
-
+    /* Sidebar */
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 200 100% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 200 100% 95%;
+    --sidebar-accent-foreground: 200 100% 30%;
+    --sidebar-border: 220 15% 90%;
+    --sidebar-ring: 200 100% 40%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Custom Tokens */
+    --telegram-blue: 200 100% 40%;
+    --telegram-blue-light: 200 100% 50%;
+    --telegram-green: 145 65% 45%;
+    --telegram-red: 0 75% 55%;
+    --telegram-orange: 35 95% 55%;
+    --surface-elevated: 0 0% 100%;
+    --surface-overlay: 220 20% 98%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Effects */
+    --glow-primary: 0 0 40px hsl(200 100% 40% / 0.3);
+    --glow-success: 0 0 30px hsl(145 65% 45% / 0.3);
+    --gradient-primary: linear-gradient(135deg, hsl(200 100% 40%), hsl(200 100% 55%));
+    --gradient-surface: linear-gradient(180deg, hsl(220 20% 98%), hsl(220 20% 95%));
+    --shadow-card: 0 4px 24px -4px hsl(220 20% 10% / 0.08);
+    --shadow-button: 0 2px 8px -2px hsl(200 100% 40% / 0.25);
+    --shadow-elevated: 0 8px 32px -8px hsl(220 20% 10% / 0.12);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 220 25% 8%;
+    --foreground: 220 10% 95%;
+    --card: 220 25% 12%;
+    --card-foreground: 220 10% 95%;
+    --popover: 220 25% 10%;
+    --popover-foreground: 220 10% 95%;
+    --primary: 200 100% 50%;
+    --primary-foreground: 220 25% 8%;
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 220 10% 85%;
+    --muted: 220 20% 15%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 200 100% 55%;
+    --accent-foreground: 220 25% 8%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 200 100% 50%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --sidebar-background: 220 25% 10%;
+    --sidebar-foreground: 220 10% 85%;
+    --sidebar-primary: 200 100% 50%;
+    --sidebar-primary-foreground: 220 25% 8%;
+    --sidebar-accent: 200 100% 15%;
+    --sidebar-accent-foreground: 200 100% 70%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 200 100% 50%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --telegram-blue: 200 100% 50%;
+    --telegram-blue-light: 200 100% 60%;
+    --surface-elevated: 220 25% 14%;
+    --surface-overlay: 220 25% 10%;
+    --glow-primary: 0 0 60px hsl(200 100% 50% / 0.25);
+    --glow-success: 0 0 40px hsl(145 65% 50% / 0.25);
+    --gradient-primary: linear-gradient(135deg, hsl(200 100% 45%), hsl(200 100% 60%));
+    --gradient-surface: linear-gradient(180deg, hsl(220 25% 12%), hsl(220 25% 8%));
+    --shadow-card: 0 4px 24px -4px hsl(0 0% 0% / 0.4);
+    --shadow-button: 0 2px 12px -2px hsl(200 100% 50% / 0.35);
+    --shadow-elevated: 0 8px 40px -8px hsl(0 0% 0% / 0.5);
   }
 }
 
@@ -100,6 +156,246 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
+}
+
+@layer components {
+  /* Telegram-style button */
+  .telegram-button {
+    @apply relative inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200;
+    @apply bg-primary text-primary-foreground;
+    box-shadow: var(--shadow-button);
+  }
+  .telegram-button:hover {
+    @apply scale-[1.02];
+    box-shadow: var(--glow-primary), var(--shadow-button);
+  }
+  .telegram-button:active {
+    @apply scale-[0.98];
+  }
+
+  /* Card styles */
+  .telegram-card {
+    @apply rounded-2xl border border-border bg-card p-5;
+    box-shadow: var(--shadow-card);
+  }
+  .telegram-card-elevated {
+    @apply rounded-2xl border border-border p-5;
+    background: hsl(var(--surface-elevated));
+    box-shadow: var(--shadow-elevated);
+  }
+
+  /* Bot preview button */
+  .bot-preview-button {
+    @apply relative flex items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium;
+    @apply bg-primary/10 text-primary border border-primary/20;
+    @apply overflow-hidden;
+    transition: width 0.25s ease, transform 0.2s ease;
+  }
+  .bot-preview-button:hover {
+    @apply bg-primary/20 border-primary/40;
+  }
+  .bot-preview-button:active {
+    transform: scale(0.97);
+  }
+
+  /* Menu tree item */
+  .menu-tree-item {
+    @apply flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-150 cursor-pointer;
+    @apply text-muted-foreground hover:text-foreground hover:bg-muted;
+  }
+  .menu-tree-item.active {
+    @apply bg-primary/10 text-primary font-medium;
+  }
+
+  /* Project card */
+  .project-card {
+    @apply telegram-card cursor-pointer transition-all duration-300;
+    @apply hover:border-primary/30 hover:scale-[1.01];
+  }
+  .project-card:hover {
+    box-shadow: var(--shadow-elevated), var(--glow-primary);
+  }
+
+  /* Glass panel */
+  .glass-panel {
+    @apply rounded-2xl border border-border/50 p-4;
+    background: hsl(var(--card) / 0.8);
+    backdrop-filter: blur(12px);
+  }
+
+  /* Input telegram style */
+  .telegram-input {
+    @apply w-full rounded-xl border border-input bg-background px-4 py-3 text-sm transition-all duration-200;
+    @apply placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary;
+  }
+
+  /* Node builder styles */
+  .builder-node {
+    @apply rounded-xl border-2 border-border bg-card p-4 min-w-[200px] transition-all duration-200;
+    box-shadow: var(--shadow-card);
+  }
+  .builder-node.selected {
+    @apply border-primary;
+    box-shadow: var(--shadow-elevated), var(--glow-primary);
+  }
+  .builder-node:hover {
+    @apply border-primary/50;
+  }
+
+  /* Phone frame */
+  .phone-frame {
+    @apply relative bg-foreground rounded-[3rem] p-3;
+    box-shadow: 0 25px 50px -12px hsl(220 20% 10% / 0.25);
+  }
+  .phone-screen {
+    @apply bg-background rounded-[2.25rem] overflow-hidden flex flex-col;
+    aspect-ratio: 9/19.5;
+  }
+
+  /* Status bar */
+  .status-bar {
+    @apply flex items-center justify-between px-6 py-2 text-xs font-medium;
+  }
+
+  /* Floating action button */
+  .fab {
+    @apply fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300;
+    @apply bg-primary text-primary-foreground;
+    box-shadow: var(--shadow-elevated), var(--glow-primary);
+  }
+  .fab:hover {
+    @apply scale-110;
+  }
+  .fab:active {
+    @apply scale-95;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    @apply w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* Action chip */
+  .action-chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium;
+    @apply bg-primary/10 text-primary border border-primary/20;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  /* Telegram Mini App container */
+  .tg-app-container {
+    height: var(--tg-viewport-stable-height, 100vh);
+    max-height: var(--tg-viewport-stable-height, 100vh);
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+  }
+
+  /* Mobile touch optimizations */
+  .touch-action-pan {
+    touch-action: pan-x pan-y;
+  }
+
+  /* Mobile-friendly node sizing */
+  @media (max-width: 768px) {
+    .builder-node {
+      @apply min-w-[180px] max-w-[220px] p-3;
+      transform-origin: center center;
+    }
+
+    .react-flow__controls {
+      @apply !bottom-20 !left-2 !right-auto;
+    }
+
+    .react-flow__minimap {
+      @apply !hidden;
+    }
+  }
+
+  /* Performance optimized nodes */
+  .node-optimized {
+    will-change: transform;
+    contain: layout style paint;
+  }
+
+  /* Safe area */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* React Flow customization */
+.react-flow__node {
+  @apply !bg-transparent;
+}
+
+.react-flow__edge-path {
+  @apply !stroke-primary/40;
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  @apply !stroke-primary;
+}
+
+/* Cuttable edge hover effect */
+.react-flow__edge-interaction {
+  cursor: pointer;
+  transition: stroke 0.2s ease;
+}
+
+.react-flow__edge-interaction:hover {
+  stroke: hsl(var(--destructive) / 0.4) !important;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: hsl(var(--destructive)) !important;
+  filter: drop-shadow(0 0 4px hsl(var(--destructive) / 0.5));
+}
+
+.react-flow__controls {
+  @apply !bg-card !border-border !rounded-xl !shadow-lg;
+}
+
+.react-flow__controls-button {
+  @apply !bg-card !border-border !fill-foreground hover:!bg-muted;
+}
+
+.react-flow__minimap {
+  @apply !bg-card/80 !border-border !rounded-xl;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/30;
 }

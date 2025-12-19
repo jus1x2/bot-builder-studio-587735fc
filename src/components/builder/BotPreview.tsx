@@ -1,6 +1,6 @@
 import { useState, useEffect, forwardRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, MoreVertical, Send } from 'lucide-react';
+import { ChevronLeft, MoreVertical, Send, RotateCcw } from 'lucide-react';
 import { BotMenu, BotButton, BotActionNode } from '@/types/bot';
 import { interpolateVariables, UserContext } from '@/hooks/useActionExecutor';
 
@@ -152,10 +152,14 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
 
   const { displayedText, isComplete } = useTypingAnimation(interpolatedMessage, 25);
 
+  // Track if we're in the middle of an action chain that will navigate
+  const [pendingMessages, setPendingMessages] = useState<Array<{ id: string; text: string; type: 'bot' | 'user' }>>([]);
+
   useEffect(() => {
     if (menu && prevMenuId !== menu.id) {
       setPrevMenuId(menu.id);
-      setActionMessages([]);
+      // Keep action messages that were added during chain execution
+      // They will be shown along with the new menu
       setIsTypingIndicator(false);
       setIsExecuting(false);
     }
@@ -177,6 +181,8 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         const text = actionNode.config.text || '';
         const interpolated = interpolateVariables(text, userContext);
         setActionMessages(prev => [...prev, { id: crypto.randomUUID(), text: interpolated, type: 'bot' }]);
+        // Add small delay so user can see the message before menu transition
+        await new Promise(resolve => setTimeout(resolve, 300));
         // Return next node info to continue chain
         return getNextNode();
       }
@@ -512,7 +518,15 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
     onButtonClick?.(button.id);
   };
 
-  const handleBack = () => { setDirection(-1); onBack?.(); };
+  const handleBack = () => { 
+    setDirection(-1); 
+    setActionMessages([]); // Clear messages when going back
+    onBack?.(); 
+  };
+
+  const handleClearChat = () => {
+    setActionMessages([]);
+  };
 
   const slideVariants = {
     enter: (dir: number) => ({ x: dir > 0 ? 100 : -100, opacity: 0 }),
@@ -533,6 +547,15 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
           <p className="text-sm font-semibold text-foreground">{botName}</p>
           <p className="text-xs text-muted-foreground">бот</p>
         </div>
+        {actionMessages.length > 0 && (
+          <button 
+            onClick={handleClearChat}
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+            title="Очистить чат"
+          >
+            <RotateCcw className="w-4 h-4 text-muted-foreground" />
+          </button>
+        )}
         <MoreVertical className="w-5 h-5 text-muted-foreground" />
       </div>
 

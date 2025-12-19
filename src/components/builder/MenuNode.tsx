@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { Handle, Position, type Node } from '@xyflow/react';
 import { motion } from 'framer-motion';
-import { MessageSquare, Trash2, Edit2, Copy, Play } from 'lucide-react';
+import { MessageSquare, Trash2, Edit2, Copy, Play, Image as ImageIcon, Video } from 'lucide-react';
 import { BotMenu, MAX_BUTTONS_PER_ROW } from '@/types/bot';
 
 export interface MenuNodeData extends Record<string, unknown> {
@@ -114,6 +114,35 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
               )}
             </div>
           </div>
+
+          {/* Media preview */}
+          {menu.mediaUrl && (
+            <div className="relative mb-3 rounded-lg overflow-hidden bg-muted/50">
+              {menu.mediaUrl.includes('.mp4') || menu.mediaUrl.includes('.webm') ? (
+                <div className="relative h-20 flex items-center justify-center bg-black/10">
+                  <Video className="w-6 h-6 text-muted-foreground" />
+                  <span className="absolute bottom-1 right-1 text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded">
+                    Видео
+                  </span>
+                </div>
+              ) : (
+                <img 
+                  src={menu.mediaUrl} 
+                  alt="" 
+                  className="w-full h-20 object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="h-20 flex items-center justify-center"><span class="text-xs text-muted-foreground">Ошибка загрузки</span></div>';
+                  }}
+                />
+              )}
+              <div className="absolute top-1 left-1">
+                <div className="bg-black/50 rounded p-0.5">
+                  <ImageIcon className="w-3 h-3 text-white" />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="bg-muted/50 rounded-lg p-2.5 mb-3">
             <p className="text-xs text-foreground line-clamp-2">

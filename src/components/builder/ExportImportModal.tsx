@@ -158,7 +158,7 @@ export function ExportImportModal({ isOpen, onClose }: ExportImportModalProps) {
                         <div className="flex-1">
                           <h3 className="font-medium text-foreground">{project.name}</h3>
                           <p className="text-sm text-muted-foreground">
-                            {project.menus.length} меню • {project.menus.reduce((acc, m) => acc + m.buttons.length, 0)} кнопок
+                            {project.menus.length} меню • {project.menus.reduce((acc, m) => acc + m.buttons.length, 0)} кнопок • {(project.actionNodes || []).length} действий
                           </p>
                         </div>
                       </div>

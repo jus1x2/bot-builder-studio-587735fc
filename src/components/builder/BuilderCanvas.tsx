@@ -15,6 +15,8 @@ import {
   getBezierPath,
   BaseEdge,
   EdgeLabelRenderer,
+  useReactFlow,
+  ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -256,6 +258,7 @@ export function BuilderCanvas() {
   const [menuToDelete, setMenuToDelete] = useState<{ menuId: string; menuName: string } | null>(null);
   const [actionNodeToDelete, setActionNodeToDelete] = useState<{ id: string; name: string } | null>(null);
   const [showActionEditor, setShowActionEditor] = useState(false);
+  const [currentViewport, setCurrentViewport] = useState({ x: 100, y: 100, zoom: 0.8 });
 
   useEffect(() => {
     if (projectId) setCurrentProject(projectId);
@@ -561,6 +564,18 @@ export function BuilderCanvas() {
     [setFlowEdges, project?.menus, project?.actionNodes, updateMenu, updateActionNode]
   );
 
+  // Calculate center position in flow coordinates from viewport
+  const getViewportCenter = useCallback(() => {
+    const containerWidth = window.innerWidth;
+    const containerHeight = window.innerHeight;
+    
+    // Convert screen center to flow coordinates
+    const centerX = (-currentViewport.x + containerWidth / 2) / currentViewport.zoom;
+    const centerY = (-currentViewport.y + containerHeight / 2) / currentViewport.zoom;
+    
+    return { x: centerX, y: centerY };
+  }, [currentViewport]);
+
   const handleAddMenu = useCallback(() => {
     if (project && project.menus.length >= MAX_MENUS_PER_PROJECT) {
       toast({
@@ -570,12 +585,16 @@ export function BuilderCanvas() {
       });
       return;
     }
+    // Get center of viewport for new menu position
+    const center = getViewportCenter();
     const newMenu = addMenu();
     if (newMenu) {
+      // Update position to center of viewport
+      updateMenu(newMenu.id, { position: { x: center.x - 140, y: center.y - 100 } });
       setNodesKey(k => k + 1);
       setShowEditor(true);
     }
-  }, [addMenu, project, toast]);
+  }, [addMenu, project, toast, getViewportCenter, updateMenu]);
 
   const handleAddActionNode = useCallback((type: ActionType) => {
     if (project && (project.actionNodes || []).length >= MAX_ACTION_NODES_PER_PROJECT) {
@@ -586,10 +605,11 @@ export function BuilderCanvas() {
       });
       return;
     }
-    const lastMenu = project?.menus[project.menus.length - 1];
+    // Get center of viewport for new action node position
+    const center = getViewportCenter();
     const position = {
-      x: (lastMenu?.position?.x || 0) + 350,
-      y: (lastMenu?.position?.y || 100) + Math.random() * 100,
+      x: center.x - 110,
+      y: center.y - 50,
     };
     const newNode = addActionNode(type, position);
     if (newNode) {
@@ -799,6 +819,7 @@ export function BuilderCanvas() {
         onNodeClick={handleNodeClick}
         onNodeDragStop={handleNodeDragStop}
         onEdgeClick={handleEdgeClick}
+        onMove={(_, viewport) => setCurrentViewport(viewport)}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView={false}

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Trash2, Package, Save, Loader2, GripVertical } from 'lucide-react';
+import { X, Plus, Trash2, Package, Save, Loader2, GripVertical, Upload, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,7 +8,6 @@ import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
 interface Product {
   id: string;
   project_id: string;
@@ -37,6 +36,49 @@ export function ProductCatalogModal({ projectId, isOpen, onClose }: ProductCatal
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadImage = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${projectId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+      
+      setEditingProduct(prev => prev ? { ...prev, image_url: publicUrl } : null);
+      toast.success('Изображение загружено');
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      toast.error('Ошибка загрузки изображения');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Файл слишком большой (макс. 5 МБ)');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error('Можно загружать только изображения');
+        return;
+      }
+      uploadImage(file);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -308,20 +350,74 @@ export function ProductCatalogModal({ projectId, isOpen, onClose }: ProductCatal
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1.5">Фото (URL)</label>
-                    <Input
-                      value={editingProduct.image_url || ''}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, image_url: e.target.value })}
-                      placeholder="https://..."
-                    />
-                    {editingProduct.image_url && (
-                      <img 
-                        src={editingProduct.image_url} 
-                        alt="" 
-                        className="w-full h-24 object-cover rounded-lg mt-2"
-                        onError={(e) => (e.target as HTMLImageElement).style.display = 'none'}
-                      />
+                    <label className="block text-sm font-medium mb-1.5">Фото</label>
+                    
+                    {/* Image preview or upload placeholder */}
+                    {editingProduct.image_url ? (
+                      <div className="relative mb-2">
+                        <img 
+                          src={editingProduct.image_url} 
+                          alt="" 
+                          className="w-full h-32 object-cover rounded-lg"
+                          onError={(e) => (e.target as HTMLImageElement).style.display = 'none'}
+                        />
+                        <button
+                          onClick={() => setEditingProduct({ ...editingProduct, image_url: null })}
+                          className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-lg hover:bg-black/70 transition-colors"
+                        >
+                          <X className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors mb-2"
+                      >
+                        {uploadingImage ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                        ) : (
+                          <>
+                            <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Нажмите для загрузки</span>
+                          </>
+                        )}
+                      </div>
                     )}
+                    
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingImage}
+                      >
+                        {uploadingImage ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                        ) : (
+                          <Upload className="w-4 h-4 mr-1" />
+                        )}
+                        Загрузить
+                      </Button>
+                    </div>
+                    
+                    <div className="mt-2">
+                      <Input
+                        value={editingProduct.image_url || ''}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, image_url: e.target.value })}
+                        placeholder="Или вставьте URL"
+                        className="text-xs"
+                      />
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3">

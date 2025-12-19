@@ -161,7 +161,7 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
     }
   }, [menu, prevMenuId]);
 
-  const executeActionNode = useCallback(async (actionNode: BotActionNode): Promise<string | null> => {
+  const executeActionNode = useCallback(async (actionNode: BotActionNode): Promise<{ navigateMenuId: string | null; nextActionId?: string }> => {
     switch (actionNode.type) {
       case 'show_text': {
         const text = actionNode.config.text || '';
@@ -184,14 +184,58 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         break;
       }
       case 'navigate_menu':
-        return actionNode.config.menuId || null;
+        return { navigateMenuId: actionNode.config.menuId || null };
       case 'open_url': {
         const url = actionNode.config.url;
         if (url) window.open(url, '_blank');
         break;
       }
+      case 'random_result': {
+        const outcomeCount = actionNode.config.outcomeCount || 2;
+        const randomIndex = Math.floor(Math.random() * outcomeCount);
+        const outcomes = actionNode.outcomes || [];
+        const selectedOutcome = outcomes[randomIndex];
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🎲 Случайный результат: Исход ${randomIndex + 1} (${Math.round(100 / outcomeCount)}%)`, 
+          type: 'bot' 
+        }]);
+        if (selectedOutcome?.targetId && selectedOutcome.targetType === 'menu') {
+          return { navigateMenuId: selectedOutcome.targetId };
+        } else if (selectedOutcome?.targetId && selectedOutcome.targetType === 'action') {
+          return { navigateMenuId: null, nextActionId: selectedOutcome.targetId };
+        }
+        break;
+      }
+      case 'weighted_random': {
+        const outcomes = actionNode.config.outcomes || [];
+        if (outcomes.length > 0) {
+          const totalWeight = outcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0);
+          let random = Math.random() * totalWeight;
+          for (let i = 0; i < outcomes.length; i++) {
+            random -= outcomes[i].weight || 1;
+            if (random <= 0) {
+              const nodeOutcomes = actionNode.outcomes || [];
+              const selectedOutcome = nodeOutcomes[i];
+              const percent = Math.round((outcomes[i].weight / totalWeight) * 100);
+              setActionMessages(prev => [...prev, { 
+                id: crypto.randomUUID(), 
+                text: `🎯 Взвешенный результат: ${outcomes[i].label || `Исход ${i + 1}`} (${percent}%)`, 
+                type: 'bot' 
+              }]);
+              if (selectedOutcome?.targetId && selectedOutcome.targetType === 'menu') {
+                return { navigateMenuId: selectedOutcome.targetId };
+              } else if (selectedOutcome?.targetId && selectedOutcome.targetType === 'action') {
+                return { navigateMenuId: null, nextActionId: selectedOutcome.targetId };
+              }
+              break;
+            }
+          }
+        }
+        break;
+      }
     }
-    return null;
+    return { navigateMenuId: null };
   }, [userContext]);
 
   const executeActionNodeChain = useCallback(async (startActionId: string): Promise<string | null> => {
@@ -201,8 +245,15 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
     while (currentNodeId) {
       const actionNode = actionNodes.find(an => an.id === currentNodeId);
       if (!actionNode) break;
-      navigateToMenuId = await executeActionNode(actionNode);
-      if (navigateToMenuId) break;
+      const result = await executeActionNode(actionNode);
+      if (result.navigateMenuId) {
+        navigateToMenuId = result.navigateMenuId;
+        break;
+      }
+      if (result.nextActionId) {
+        currentNodeId = result.nextActionId;
+        continue;
+      }
       if (actionNode.nextNodeType === 'menu' && actionNode.nextNodeId) {
         navigateToMenuId = actionNode.nextNodeId;
         break;

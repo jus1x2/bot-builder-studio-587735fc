@@ -196,8 +196,8 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         const outcomes = actionNode.outcomes || [];
         const selectedOutcome = outcomes[randomIndex];
         
-        // Only show notification if enabled (default true)
-        if (actionNode.config.showNotification !== false) {
+        // Only show notification if explicitly enabled
+        if (actionNode.config.showNotification === true) {
           setActionMessages(prev => [...prev, { 
             id: crypto.randomUUID(), 
             text: `🎲 Случайный результат: Исход ${randomIndex + 1} (${Math.round(100 / outcomeCount)}%)`, 
@@ -224,8 +224,8 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
               const selectedOutcome = nodeOutcomes[i];
               const percent = Math.round((outcomes[i].weight / totalWeight) * 100);
               
-              // Only show notification if enabled (default true)
-              if (actionNode.config.showNotification !== false) {
+              // Only show notification if explicitly enabled
+              if (actionNode.config.showNotification === true) {
                 setActionMessages(prev => [...prev, { 
                   id: crypto.randomUUID(), 
                   text: `🎯 Взвешенный результат: ${outcomes[i].label || `Исход ${i + 1}`} (${percent}%)`, 

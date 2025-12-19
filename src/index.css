@@ -234,7 +234,7 @@ html, body {
 
   /* Node builder styles */
   .builder-node {
-    @apply rounded-xl border-2 border-border bg-card p-4 min-w-[200px] transition-all duration-200;
+    @apply rounded-xl border-2 border-border bg-card p-4 min-w-[200px] transition-colors duration-200;
     box-shadow: var(--shadow-card);
   }
   .builder-node.selected {
@@ -243,6 +243,12 @@ html, body {
   }
   .builder-node:hover {
     @apply border-primary/50;
+  }
+  .builder-node.orphan-node {
+    border-color: hsl(var(--telegram-orange) / 0.6);
+  }
+  .builder-node.dragging {
+    @apply border-primary;
   }
 
   /* Phone frame */

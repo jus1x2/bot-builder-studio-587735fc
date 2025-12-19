@@ -58,6 +58,12 @@ export interface BotAction {
   config: Record<string, any>;
 }
 
+export interface ActionNodeOutcome {
+  id: string;
+  targetId?: string;
+  targetType?: 'action' | 'menu';
+}
+
 export interface BotActionNode {
   id: string;
   type: ActionType;
@@ -65,6 +71,8 @@ export interface BotActionNode {
   position: { x: number; y: number };
   nextNodeId?: string;
   nextNodeType?: 'action' | 'menu';
+  // For multi-output actions like random_result
+  outcomes?: ActionNodeOutcome[];
 }
 
 export interface BotButton {

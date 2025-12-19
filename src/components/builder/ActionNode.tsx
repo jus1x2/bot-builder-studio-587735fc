@@ -1,7 +1,7 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Handle, Position, type Node } from '@xyflow/react';
 import { motion } from 'framer-motion';
-import { Trash2, Settings, Copy, icons, Package, ShoppingCart, CreditCard, Wallet, Plus } from 'lucide-react';
+import { Trash2, Settings, Copy, icons, Package, ShoppingCart, CreditCard, Wallet, Plus, Dice1 } from 'lucide-react';
 import { BotActionNode, ACTION_INFO } from '@/types/bot';
 
 export interface ActionNodeData extends Record<string, unknown> {
@@ -26,6 +26,29 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
   const actionInfo = ACTION_INFO[actionNode.type];
   const IconComponent = (icons as any)[actionInfo?.icon] || icons.Zap;
 
+  // Check if this is a multi-output action
+  const isMultiOutput = actionNode.type === 'random_result';
+  const outcomeCount = actionNode.config?.outcomeCount || 2;
+  const outcomes = actionNode.outcomes || [];
+
+  // Calculate positions for multiple handles
+  const handlePositions = useMemo(() => {
+    if (!isMultiOutput) return [];
+    const positions: { id: string; top: number; percent: number }[] = [];
+    const nodeHeight = 120; // Approximate node height
+    const spacing = nodeHeight / (outcomeCount + 1);
+    
+    for (let i = 0; i < outcomeCount; i++) {
+      const id = outcomes[i]?.id || `outcome-${i}`;
+      positions.push({
+        id,
+        top: spacing * (i + 1),
+        percent: Math.round(100 / outcomeCount),
+      });
+    }
+    return positions;
+  }, [isMultiOutput, outcomeCount, outcomes]);
+
   const getConfigPreview = () => {
     switch (actionNode.type) {
       case 'show_text':
@@ -47,6 +70,8 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
         return `${field} = ${value || ''}`;
       case 'navigate_menu':
         return 'Переход в меню';
+      case 'random_result':
+        return `${outcomeCount} исходов`;
       case 'show_product':
       case 'show_cart':
       case 'process_payment':
@@ -70,6 +95,9 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     }
     if (type.includes('cart') || type.includes('product') || type.includes('payment') || type.includes('promo')) {
       return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600';
+    }
+    if (['random_result', 'weighted_random', 'lottery'].includes(type)) {
+      return 'bg-pink-500/10 border-pink-500/30 text-pink-500';
     }
     return 'bg-muted border-border text-muted-foreground';
   };
@@ -305,6 +333,36 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
+  // Random result preview for multi-output
+  const renderRandomResultPreview = () => {
+    if (!isMultiOutput) return null;
+    
+    return (
+      <div className="mt-2 p-2 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800/30">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Dice1 className="w-3.5 h-3.5 text-pink-500" />
+          <span className="text-[10px] font-medium text-pink-700 dark:text-pink-300">
+            Случайный выбор
+          </span>
+        </div>
+        <div className="space-y-1">
+          {handlePositions.map((pos, i) => (
+            <div 
+              key={pos.id} 
+              className="flex items-center justify-between text-[9px] p-1 bg-white/50 dark:bg-black/20 rounded"
+            >
+              <span className="text-pink-600 dark:text-pink-400">Исход {i + 1}</span>
+              <span className="font-medium text-pink-700 dark:text-pink-300">{pos.percent}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Calculate dynamic height for multi-output nodes
+  const nodeMinHeight = isMultiOutput ? Math.max(120, outcomeCount * 35 + 80) : undefined;
+
   return (
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
@@ -312,7 +370,11 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       className={`action-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-all ${colorClasses} ${
         isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
       }`}
-      style={{ minWidth: hasCustomPreview ? 200 : 180, maxWidth: hasCustomPreview ? 240 : 220 }}
+      style={{ 
+        minWidth: hasCustomPreview || isMultiOutput ? 200 : 180, 
+        maxWidth: hasCustomPreview || isMultiOutput ? 240 : 220,
+        minHeight: nodeMinHeight,
+      }}
     >
       <Handle
         type="target"
@@ -353,7 +415,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
         </div>
       </div>
 
-      {configPreview && (
+      {configPreview && !isMultiOutput && (
         <div className="text-[10px] opacity-80 truncate">
           {configPreview}
         </div>
@@ -363,13 +425,32 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       {renderCartPreview()}
       {renderPaymentPreview()}
       {renderAddToCartPreview()}
+      {renderRandomResultPreview()}
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!w-3 !h-3 !bg-current !border-2 !border-background !rounded-full"
-        style={{ right: -6 }}
-      />
+      {/* Single output handle for non-multi-output nodes */}
+      {!isMultiOutput && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!w-3 !h-3 !bg-current !border-2 !border-background !rounded-full"
+          style={{ right: -6 }}
+        />
+      )}
+
+      {/* Multiple output handles for random_result */}
+      {isMultiOutput && handlePositions.map((pos, i) => (
+        <Handle
+          key={pos.id}
+          type="source"
+          position={Position.Right}
+          id={pos.id}
+          className="!w-3 !h-3 !bg-pink-500 !border-2 !border-background !rounded-full"
+          style={{ 
+            right: -6, 
+            top: `${((i + 1) / (outcomeCount + 1)) * 100}%`,
+          }}
+        />
+      ))}
     </motion.div>
   );
 }

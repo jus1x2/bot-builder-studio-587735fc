@@ -671,11 +671,18 @@ export const useProjectStore = create<ProjectStore>()(
           return null;
         }
 
+        // Initialize outcomes for multi-output actions
+        const isMultiOutput = type === 'random_result';
+        const defaultOutcomeCount = 2;
+
         const actionNode: BotActionNode = {
           id: uuidv4(),
           type,
-          config: {},
+          config: isMultiOutput ? { outcomeCount: defaultOutcomeCount } : {},
           position,
+          outcomes: isMultiOutput
+            ? Array.from({ length: defaultOutcomeCount }, () => ({ id: uuidv4() }))
+            : undefined,
         };
 
         set((state) => ({
@@ -703,9 +710,31 @@ export const useProjectStore = create<ProjectStore>()(
             p.id === project.id
               ? {
                   ...p,
-                  actionNodes: (p.actionNodes || []).map((an) =>
-                    an.id === actionNodeId ? { ...an, ...updates } : an
-                  ),
+                  actionNodes: (p.actionNodes || []).map((an) => {
+                    if (an.id !== actionNodeId) return an;
+                    
+                    const updatedNode = { ...an, ...updates };
+                    
+                    // Sync outcomes array when outcomeCount changes for random_result
+                    if (updatedNode.type === 'random_result' && updates.config?.outcomeCount !== undefined) {
+                      const newCount = updates.config.outcomeCount;
+                      const currentOutcomes = updatedNode.outcomes || [];
+                      
+                      if (newCount > currentOutcomes.length) {
+                        // Add new outcomes
+                        const newOutcomes = Array.from(
+                          { length: newCount - currentOutcomes.length },
+                          () => ({ id: uuidv4() })
+                        );
+                        updatedNode.outcomes = [...currentOutcomes, ...newOutcomes];
+                      } else if (newCount < currentOutcomes.length) {
+                        // Remove excess outcomes
+                        updatedNode.outcomes = currentOutcomes.slice(0, newCount);
+                      }
+                    }
+                    
+                    return updatedNode;
+                  }),
                   updatedAt: new Date(),
                 }
               : p

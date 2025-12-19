@@ -413,7 +413,40 @@ export function BuilderCanvas() {
     });
 
     (project.actionNodes || []).forEach((actionNode) => {
-      if (actionNode.nextNodeId) {
+      // Check if this is a multi-output action (random_result)
+      const isMultiOutput = actionNode.type === 'random_result';
+      
+      if (isMultiOutput && actionNode.outcomes) {
+        // Create edges for each outcome
+        actionNode.outcomes.forEach((outcome, index) => {
+          if (outcome.targetId) {
+            const isMenuTarget = menuIdSet.has(outcome.targetId);
+            const isActionTarget = actionNodeIdSet.has(outcome.targetId);
+            
+            if (isMenuTarget || isActionTarget) {
+              edgeList.push({
+                id: `action-${actionNode.id}-outcome-${outcome.id}`,
+                source: actionNode.id,
+                sourceHandle: outcome.id,
+                target: outcome.targetId,
+                type: 'cuttable',
+                animated: true,
+                style: {
+                  strokeWidth: 2,
+                  stroke: 'hsl(330 80% 60%)', // Pink for random outcomes
+                },
+                label: `${Math.round(100 / (actionNode.config?.outcomeCount || 2))}%`,
+                data: {
+                  actionNodeId: actionNode.id,
+                  outcomeId: outcome.id,
+                  isActionConnection: true,
+                  isMultiOutput: true,
+                },
+              });
+            }
+          }
+        });
+      } else if (actionNode.nextNodeId) {
         const isMenuTarget = menuIdSet.has(actionNode.nextNodeId);
         const isActionTarget = actionNodeIdSet.has(actionNode.nextNodeId);
 
@@ -479,10 +512,24 @@ export function BuilderCanvas() {
       }
 
       if (sourceActionNode) {
-        updateActionNode(params.source, {
-          nextNodeId: params.target,
-          nextNodeType: targetIsMenu ? 'menu' : 'action',
-        });
+        const targetIsMenu = project?.menus.some(m => m.id === params.target);
+        const isMultiOutput = sourceActionNode.type === 'random_result';
+        
+        if (isMultiOutput && params.sourceHandle) {
+          // Update the specific outcome's target
+          const updatedOutcomes = (sourceActionNode.outcomes || []).map(outcome =>
+            outcome.id === params.sourceHandle
+              ? { ...outcome, targetId: params.target!, targetType: (targetIsMenu ? 'menu' : 'action') as 'menu' | 'action' }
+              : outcome
+          );
+          updateActionNode(params.source, { outcomes: updatedOutcomes });
+        } else {
+          // Standard single-output action
+          updateActionNode(params.source, {
+            nextNodeId: params.target,
+            nextNodeType: targetIsMenu ? 'menu' : 'action',
+          });
+        }
         setNodesKey(k => k + 1);
         return;
       }

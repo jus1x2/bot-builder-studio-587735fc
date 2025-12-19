@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Trash2, HelpCircle } from 'lucide-react';
+import { X, Save, Trash2, HelpCircle, Package, Loader2 } from 'lucide-react';
 import { BotActionNode, BotMenu, ACTION_INFO, ActionType } from '@/types/bot';
 import { useProjectStore } from '@/stores/projectStore';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,20 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ActionHelpPanel } from './ActionHelpPanel';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  old_price: number | null;
+  image_url: string | null;
+  sku: string | null;
+  stock: number | null;
+  max_quantity: number | null;
+  variants: string[] | null;
+}
 
 interface ActionNodeEditorProps {
   actionNode: BotActionNode;
@@ -20,8 +34,56 @@ interface ActionNodeEditorProps {
 
 export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: ActionNodeEditorProps) {
   const [showHelp, setShowHelp] = useState(false);
-  const { updateActionNode } = useProjectStore();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const { updateActionNode, getCurrentProject } = useProjectStore();
+  const currentProject = getCurrentProject();
   const info = ACTION_INFO[actionNode.type];
+
+  // Load products for shop actions
+  useEffect(() => {
+    if (['show_product', 'add_to_cart'].includes(actionNode.type) && currentProject?.id) {
+      loadProducts();
+    }
+  }, [actionNode.type, currentProject?.id]);
+
+  const loadProducts = async () => {
+    if (!currentProject?.id) return;
+    setLoadingProducts(true);
+    try {
+      const { data, error } = await supabase
+        .from('bot_products')
+        .select('*')
+        .eq('project_id', currentProject.id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (err) {
+      console.error('Error loading products:', err);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const selectProduct = (product: Product) => {
+    updateActionNode(actionNode.id, {
+      config: {
+        ...actionNode.config,
+        productId: product.id,
+        productName: product.name,
+        productDescription: product.description || '',
+        price: Number(product.price),
+        oldPrice: product.old_price ? Number(product.old_price) : undefined,
+        imageUrl: product.image_url || '',
+        sku: product.sku || '',
+        stock: product.stock ?? undefined,
+        maxQuantity: product.max_quantity || 10,
+        variants: product.variants || [],
+      }
+    });
+  };
 
   const updateConfig = (key: string, value: any) => {
     updateActionNode(actionNode.id, {
@@ -457,6 +519,63 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
               <p className="text-sm text-green-600 dark:text-green-400 font-medium">🛒 Карточка товара</p>
               <p className="text-xs text-muted-foreground mt-1">Создаёт сообщение с информацией о товаре и кнопками действий</p>
             </div>
+            
+            {/* Product catalog selection */}
+            {products.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Выбрать из каталога
+                </label>
+                <Select
+                  value={actionNode.config.productId || ''}
+                  onValueChange={(value) => {
+                    const product = products.find(p => p.id === value);
+                    if (product) selectProduct(product);
+                  }}
+                >
+                  <SelectTrigger className="telegram-input">
+                    <SelectValue placeholder="Выберите товар из каталога" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        <div className="flex items-center gap-2">
+                          {product.image_url ? (
+                            <img src={product.image_url} alt="" className="w-6 h-6 rounded object-cover" />
+                          ) : (
+                            <Package className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <span>{product.name}</span>
+                          <span className="text-muted-foreground ml-auto">
+                            {Number(product.price).toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
+            {loadingProducts && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Загрузка каталога...
+              </div>
+            )}
+            
+            {products.length === 0 && !loadingProducts && (
+              <div className="p-3 bg-muted/50 rounded-lg border border-dashed">
+                <p className="text-xs text-muted-foreground text-center">
+                  Каталог пуст. Заполните данные товара вручную или добавьте товары в каталог.
+                </p>
+              </div>
+            )}
+            
+            <div className="border-t pt-4">
+              <p className="text-xs text-muted-foreground mb-3">Или заполните вручную:</p>
+            </div>
+            
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Название товара

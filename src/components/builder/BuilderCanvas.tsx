@@ -20,7 +20,7 @@ import '@xyflow/react/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Play, Eye, ChevronLeft, Download, ShoppingCart, Bot, Scissors, 
-  LayoutGrid, Trash2, Undo2, Redo2, Save, Cloud, CloudOff, Loader2, WifiOff
+  LayoutGrid, Trash2, Undo2, Redo2, Save, Cloud, CloudOff, Loader2, WifiOff, Package
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProjectStore } from '@/stores/projectStore';
@@ -33,6 +33,7 @@ import { PhoneFrame } from '@/components/layout/PhoneFrame';
 import { ExportImportModal } from './ExportImportModal';
 import { PurchaseRequestModal } from './PurchaseRequestModal';
 import { TelegramConnectModal } from './TelegramConnectModal';
+import { ProductCatalogModal } from './ProductCatalogModal';
 import { FabMenu } from './FabMenu';
 import { Button } from '@/components/ui/button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -247,6 +248,7 @@ export function BuilderCanvas() {
   const [showExportImport, setShowExportImport] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
   const [showTelegram, setShowTelegram] = useState(false);
+  const [showProductCatalog, setShowProductCatalog] = useState(false);
   const [nodesKey, setNodesKey] = useState(0);
   const [previewMenuId, setPreviewMenuId] = useState<string | null>(null);
   const [previewHistory, setPreviewHistory] = useState<string[]>([]);
@@ -857,6 +859,10 @@ export function BuilderCanvas() {
                 <LayoutGrid className="w-4 h-4 mr-2" />
                 Авто-раскладка
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowProductCatalog(true)}>
+                <Package className="w-4 h-4 mr-2" />
+                Каталог товаров
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowPurchase(true)}>
                 <ShoppingCart className="w-4 h-4 mr-2" />
                 Получить код
@@ -967,6 +973,11 @@ export function BuilderCanvas() {
       <TelegramConnectModal
         isOpen={showTelegram}
         onClose={() => setShowTelegram(false)}
+      />
+      <ProductCatalogModal
+        projectId={project.id}
+        isOpen={showProductCatalog}
+        onClose={() => setShowProductCatalog(false)}
       />
 
       {/* Delete Edge Confirmation */}

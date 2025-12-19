@@ -158,8 +158,7 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
   useEffect(() => {
     if (menu && prevMenuId !== menu.id) {
       setPrevMenuId(menu.id);
-      // Keep action messages that were added during chain execution
-      // They will be shown along with the new menu
+      // Keep action messages - they're intentionally preserved during chain execution
       setIsTypingIndicator(false);
       setIsExecuting(false);
     }
@@ -181,8 +180,8 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         const text = actionNode.config.text || '';
         const interpolated = interpolateVariables(text, userContext);
         setActionMessages(prev => [...prev, { id: crypto.randomUUID(), text: interpolated, type: 'bot' }]);
-        // Add small delay so user can see the message before menu transition
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Add delay so user can see the message before menu transition
+        await new Promise(resolve => setTimeout(resolve, 800));
         // Return next node info to continue chain
         return getNextNode();
       }
@@ -389,6 +388,80 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         } else if (actionNode.nextNodeType === 'action' && actionNode.nextNodeId) {
           return { navigateMenuId: null, nextActionId: actionNode.nextNodeId };
         }
+        break;
+      }
+      case 'lottery': {
+        const winChance = actionNode.config.winChance || 10;
+        const isWin = Math.random() * 100 < winChance;
+        const prize = actionNode.config.prize || 'приз';
+        
+        if (isWin) {
+          const winMessage = (actionNode.config.winMessage || '🎉 Поздравляем! Вы выиграли {prize}!')
+            .replace('{prize}', prize);
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: winMessage, 
+            type: 'bot' 
+          }]);
+        } else {
+          const loseMessage = actionNode.config.loseMessage || '😔 К сожалению, не повезло. Попробуйте ещё!';
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: loseMessage, 
+            type: 'bot' 
+          }]);
+        }
+        
+        // Navigate to win/lose outcome if connected
+        const outcomes = actionNode.outcomes || [];
+        const selectedOutcome = isWin ? outcomes[0] : outcomes[1];
+        if (selectedOutcome?.targetId && selectedOutcome.targetType === 'menu') {
+          return { navigateMenuId: selectedOutcome.targetId };
+        } else if (selectedOutcome?.targetId && selectedOutcome.targetType === 'action') {
+          return { navigateMenuId: null, nextActionId: selectedOutcome.targetId };
+        }
+        break;
+      }
+      case 'leaderboard': {
+        const title = actionNode.config.title || '🏆 Топ игроков';
+        const limit = actionNode.config.limit || 10;
+        
+        // Generate demo leaderboard
+        const demoPlayers = [
+          { name: 'Александр', score: 1520 },
+          { name: 'Мария', score: 1380 },
+          { name: 'Дмитрий', score: 1250 },
+          { name: 'Елена', score: 1100 },
+          { name: 'Иван (Вы)', score: 950 },
+        ].slice(0, Math.min(limit, 5));
+        
+        let leaderboardText = `${title}\n\n`;
+        demoPlayers.forEach((player, i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+          leaderboardText += `${medal} ${player.name} — ${player.score} очков\n`;
+        });
+        
+        if (actionNode.config.showUserPosition !== false) {
+          leaderboardText += `\n📍 Ваша позиция: #5`;
+        }
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: leaderboardText.trim(), 
+          type: 'bot' 
+        }]);
+        break;
+      }
+      case 'modify_points': {
+        const points = actionNode.config.points || 0;
+        const operation = actionNode.config.operation || 'add';
+        const opText = operation === 'add' ? '+' : operation === 'subtract' ? '-' : '=';
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `⭐ Баллы: ${opText}${points}`, 
+          type: 'bot' 
+        }]);
         break;
       }
     }

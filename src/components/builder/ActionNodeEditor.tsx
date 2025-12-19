@@ -1790,6 +1790,210 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
           </div>
         );
 
+      case 'lottery':
+        return (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300 mb-1">
+                🎰 Лотерея
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Случайный розыгрыш с настраиваемым шансом выигрыша
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Шанс выигрыша (%)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={actionNode.config.winChance || 10}
+                onChange={(e) => updateConfig('winChance', Number(e.target.value))}
+                className="telegram-input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Вероятность выигрыша: {actionNode.config.winChance || 10}%
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Приз
+              </label>
+              <Input
+                value={actionNode.config.prize || ''}
+                onChange={(e) => updateConfig('prize', e.target.value)}
+                placeholder="100 баллов"
+                className="telegram-input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Баллы за выигрыш
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={actionNode.config.prizePoints || 0}
+                onChange={(e) => updateConfig('prizePoints', Number(e.target.value))}
+                className="telegram-input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Сколько баллов начислить при выигрыше
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сообщение при выигрыше
+              </label>
+              <Textarea
+                value={actionNode.config.winMessage || '🎉 Поздравляем! Вы выиграли {prize}!'}
+                onChange={(e) => updateConfig('winMessage', e.target.value)}
+                placeholder="🎉 Поздравляем! Вы выиграли {prize}!"
+                rows={2}
+                className="telegram-input resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сообщение при проигрыше
+              </label>
+              <Textarea
+                value={actionNode.config.loseMessage || '😔 К сожалению, не повезло. Попробуйте ещё!'}
+                onChange={(e) => updateConfig('loseMessage', e.target.value)}
+                placeholder="😔 К сожалению, не повезло. Попробуйте ещё!"
+                rows={2}
+                className="telegram-input resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Ограничить попытки в день
+              </label>
+              <Switch
+                checked={actionNode.config.limitPerDay || false}
+                onCheckedChange={(checked) => updateConfig('limitPerDay', checked)}
+              />
+            </div>
+
+            {actionNode.config.limitPerDay && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Макс. попыток в день
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={actionNode.config.maxAttemptsPerDay || 1}
+                  onChange={(e) => updateConfig('maxAttemptsPerDay', Number(e.target.value))}
+                  className="telegram-input"
+                />
+              </div>
+            )}
+
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-xs text-muted-foreground">
+                💡 Подключите выходы "Выигрыш" и "Проигрыш" к разным меню на канвасе
+              </p>
+            </div>
+          </div>
+        );
+
+      case 'leaderboard':
+        return (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30">
+              <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-1">
+                🏆 Таблица лидеров
+              </p>
+              <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                Показывает рейтинг пользователей по баллам
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Заголовок
+              </label>
+              <Input
+                value={actionNode.config.title || '🏆 Топ игроков'}
+                onChange={(e) => updateConfig('title', e.target.value)}
+                placeholder="🏆 Топ игроков"
+                className="telegram-input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Количество позиций
+              </label>
+              <Input
+                type="number"
+                min={3}
+                max={50}
+                value={actionNode.config.limit || 10}
+                onChange={(e) => updateConfig('limit', Number(e.target.value))}
+                className="telegram-input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Показать топ-{actionNode.config.limit || 10} участников
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Показать позицию пользователя
+              </label>
+              <Switch
+                checked={actionNode.config.showUserPosition !== false}
+                onCheckedChange={(checked) => updateConfig('showUserPosition', checked)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Показать изменение позиции
+              </label>
+              <Switch
+                checked={actionNode.config.showPositionChange || false}
+                onCheckedChange={(checked) => updateConfig('showPositionChange', checked)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Формат отображения
+              </label>
+              <Select
+                value={actionNode.config.displayFormat || 'list'}
+                onValueChange={(value) => updateConfig('displayFormat', value)}
+              >
+                <SelectTrigger className="telegram-input">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="list">Список</SelectItem>
+                  <SelectItem value="compact">Компактный</SelectItem>
+                  <SelectItem value="detailed">Детальный</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-xs text-muted-foreground">
+                📊 Рейтинг формируется на основе баллов пользователей
+              </p>
+            </div>
+          </div>
+        );
+
       default:
         return (
           <div className="text-center py-6 text-muted-foreground">

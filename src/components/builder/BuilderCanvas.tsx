@@ -413,10 +413,17 @@ export function BuilderCanvas() {
     });
 
     (project.actionNodes || []).forEach((actionNode) => {
-      // Check if this is a multi-output action (random_result)
-      const isMultiOutput = actionNode.type === 'random_result';
+      // Check if this is a multi-output action (random_result or weighted_random)
+      const isMultiOutput = actionNode.type === 'random_result' || actionNode.type === 'weighted_random';
+      const isWeighted = actionNode.type === 'weighted_random';
       
       if (isMultiOutput && actionNode.outcomes) {
+        // For weighted_random, get weights from config.outcomes
+        const weightedOutcomes = actionNode.config?.outcomes || [];
+        const totalWeight = isWeighted 
+          ? weightedOutcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0) 
+          : (actionNode.config?.outcomeCount || 2);
+        
         // Create edges for each outcome
         actionNode.outcomes.forEach((outcome, index) => {
           if (outcome.targetId) {
@@ -424,6 +431,20 @@ export function BuilderCanvas() {
             const isActionTarget = actionNodeIdSet.has(outcome.targetId);
             
             if (isMenuTarget || isActionTarget) {
+              // Calculate percentage for label
+              let percent: number;
+              let label: string;
+              
+              if (isWeighted) {
+                const weight = weightedOutcomes[index]?.weight || 1;
+                percent = Math.round((weight / totalWeight) * 100);
+                const outcomeLabel = weightedOutcomes[index]?.label;
+                label = outcomeLabel ? `${outcomeLabel} (${percent}%)` : `${percent}%`;
+              } else {
+                percent = Math.round(100 / (actionNode.config?.outcomeCount || 2));
+                label = `${percent}%`;
+              }
+              
               edgeList.push({
                 id: `action-${actionNode.id}-outcome-${outcome.id}`,
                 source: actionNode.id,
@@ -433,14 +454,15 @@ export function BuilderCanvas() {
                 animated: true,
                 style: {
                   strokeWidth: 2,
-                  stroke: 'hsl(330 80% 60%)', // Pink for random outcomes
+                  stroke: isWeighted ? 'hsl(30 90% 55%)' : 'hsl(330 80% 60%)', // Orange for weighted, Pink for random
                 },
-                label: `${Math.round(100 / (actionNode.config?.outcomeCount || 2))}%`,
+                label,
                 data: {
                   actionNodeId: actionNode.id,
                   outcomeId: outcome.id,
                   isActionConnection: true,
                   isMultiOutput: true,
+                  isWeighted,
                 },
               });
             }
@@ -513,7 +535,7 @@ export function BuilderCanvas() {
 
       if (sourceActionNode) {
         const targetIsMenu = project?.menus.some(m => m.id === params.target);
-        const isMultiOutput = sourceActionNode.type === 'random_result';
+        const isMultiOutput = sourceActionNode.type === 'random_result' || sourceActionNode.type === 'weighted_random';
         
         if (isMultiOutput && params.sourceHandle) {
           // Update the specific outcome's target

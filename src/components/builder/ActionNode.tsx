@@ -27,27 +27,40 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
   const IconComponent = (icons as any)[actionInfo?.icon] || icons.Zap;
 
   // Check if this is a multi-output action
-  const isMultiOutput = actionNode.type === 'random_result';
-  const outcomeCount = actionNode.config?.outcomeCount || 2;
+  const isMultiOutput = actionNode.type === 'random_result' || actionNode.type === 'weighted_random';
+  const isWeighted = actionNode.type === 'weighted_random';
+  
+  // For random_result use outcomeCount, for weighted_random use outcomes array
+  const weightedOutcomes = actionNode.config?.outcomes || [];
+  const outcomeCount = isWeighted 
+    ? weightedOutcomes.length || 2 
+    : (actionNode.config?.outcomeCount || 2);
   const outcomes = actionNode.outcomes || [];
+
+  // Calculate total weight for percentage display
+  const totalWeight = isWeighted 
+    ? weightedOutcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0) 
+    : outcomeCount;
 
   // Calculate positions for multiple handles
   const handlePositions = useMemo(() => {
     if (!isMultiOutput) return [];
-    const positions: { id: string; top: number; percent: number }[] = [];
-    const nodeHeight = 120; // Approximate node height
-    const spacing = nodeHeight / (outcomeCount + 1);
+    const positions: { id: string; percent: number; label?: string }[] = [];
     
     for (let i = 0; i < outcomeCount; i++) {
-      const id = outcomes[i]?.id || `outcome-${i}`;
-      positions.push({
-        id,
-        top: spacing * (i + 1),
-        percent: Math.round(100 / outcomeCount),
-      });
+      const id = isWeighted 
+        ? (weightedOutcomes[i]?.id || `outcome-${i}`)
+        : (outcomes[i]?.id || `outcome-${i}`);
+      const weight = isWeighted ? (weightedOutcomes[i]?.weight || 1) : 1;
+      const percent = isWeighted 
+        ? Math.round((weight / totalWeight) * 100)
+        : Math.round(100 / outcomeCount);
+      const label = isWeighted ? weightedOutcomes[i]?.label : undefined;
+      
+      positions.push({ id, percent, label });
     }
     return positions;
-  }, [isMultiOutput, outcomeCount, outcomes]);
+  }, [isMultiOutput, isWeighted, outcomeCount, outcomes, weightedOutcomes, totalWeight]);
 
   const getConfigPreview = () => {
     switch (actionNode.type) {
@@ -72,6 +85,8 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
         return 'Переход в меню';
       case 'random_result':
         return `${outcomeCount} исходов`;
+      case 'weighted_random':
+        return `${outcomeCount} взвеш. исходов`;
       case 'show_product':
       case 'show_cart':
       case 'process_payment':
@@ -96,8 +111,11 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     if (type.includes('cart') || type.includes('product') || type.includes('payment') || type.includes('promo')) {
       return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600';
     }
-    if (['random_result', 'weighted_random', 'lottery'].includes(type)) {
+    if (['random_result', 'lottery'].includes(type)) {
       return 'bg-pink-500/10 border-pink-500/30 text-pink-500';
+    }
+    if (type === 'weighted_random') {
+      return 'bg-orange-500/10 border-orange-500/30 text-orange-500';
     }
     return 'bg-muted border-border text-muted-foreground';
   };
@@ -333,16 +351,27 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
-  // Random result preview for multi-output
+  // Random/Weighted result preview for multi-output
   const renderRandomResultPreview = () => {
     if (!isMultiOutput) return null;
     
+    const bgColor = isWeighted 
+      ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/30'
+      : 'bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800/30';
+    const textColor = isWeighted
+      ? 'text-orange-700 dark:text-orange-300'
+      : 'text-pink-700 dark:text-pink-300';
+    const subTextColor = isWeighted
+      ? 'text-orange-600 dark:text-orange-400'
+      : 'text-pink-600 dark:text-pink-400';
+    const iconColor = isWeighted ? 'text-orange-500' : 'text-pink-500';
+    
     return (
-      <div className="mt-2 p-2 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800/30">
+      <div className={`mt-2 p-2 rounded-lg border ${bgColor}`}>
         <div className="flex items-center gap-1.5 mb-2">
-          <Dice1 className="w-3.5 h-3.5 text-pink-500" />
-          <span className="text-[10px] font-medium text-pink-700 dark:text-pink-300">
-            Случайный выбор
+          <Dice1 className={`w-3.5 h-3.5 ${iconColor}`} />
+          <span className={`text-[10px] font-medium ${textColor}`}>
+            {isWeighted ? 'Взвешенный выбор' : 'Случайный выбор'}
           </span>
         </div>
         <div className="space-y-1">
@@ -351,8 +380,10 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
               key={pos.id} 
               className="flex items-center justify-between text-[9px] p-1 bg-white/50 dark:bg-black/20 rounded"
             >
-              <span className="text-pink-600 dark:text-pink-400">Исход {i + 1}</span>
-              <span className="font-medium text-pink-700 dark:text-pink-300">{pos.percent}%</span>
+              <span className={subTextColor}>
+                {pos.label || `Исход ${i + 1}`}
+              </span>
+              <span className={`font-medium ${textColor}`}>{pos.percent}%</span>
             </div>
           ))}
         </div>
@@ -437,14 +468,16 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
         />
       )}
 
-      {/* Multiple output handles for random_result */}
+      {/* Multiple output handles for random_result / weighted_random */}
       {isMultiOutput && handlePositions.map((pos, i) => (
         <Handle
           key={pos.id}
           type="source"
           position={Position.Right}
           id={pos.id}
-          className="!w-3 !h-3 !bg-pink-500 !border-2 !border-background !rounded-full"
+          className={`!w-3 !h-3 !border-2 !border-background !rounded-full ${
+            isWeighted ? '!bg-orange-500' : '!bg-pink-500'
+          }`}
           style={{ 
             right: -6, 
             top: `${((i + 1) / (outcomeCount + 1)) * 100}%`,

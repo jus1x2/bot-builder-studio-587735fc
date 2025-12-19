@@ -1,36 +1,25 @@
 import { supabase } from '@/integrations/supabase/client';
 import { BotProject, BotMenu, BotButton, BotActionNode } from '@/types/bot';
 
-export interface DbBotProject {
-  id: string;
-  name: string;
-  telegram_bot_token: string | null;
-  telegram_bot_username: string | null;
-  user_id: string | null;
-  settings: {
-    welcomeMessage: string;
-    defaultMenuId: string;
-  };
-  created_at: string;
-  updated_at: string;
-}
-
 // Save project to database
-export async function saveProjectToDatabase(project: BotProject, userId?: string): Promise<boolean> {
+export async function saveProjectToDatabase(project: BotProject, profileId: string): Promise<boolean> {
   try {
+    console.log('Saving project to database:', project.id, 'for profile:', profileId);
+
     // Upsert project
     const { error: projectError } = await supabase
       .from('bot_projects')
       .upsert({
         id: project.id,
+        profile_id: profileId,
         name: project.name,
+        description: project.description || null,
+        template: project.template || 'blank',
         telegram_bot_token: project.telegramBotToken || null,
         telegram_bot_username: project.telegramBotUsername || null,
-        user_id: userId || null,
-        settings: {
-          welcomeMessage: project.globalSettings?.welcomeMessage || '',
-          defaultMenuId: project.rootMenuId || '',
-        },
+        root_menu_id: project.rootMenuId || null,
+        status: project.status || 'draft',
+        global_settings: project.globalSettings || {},
       });
 
     if (projectError) {
@@ -38,7 +27,7 @@ export async function saveProjectToDatabase(project: BotProject, userId?: string
       return false;
     }
 
-    // Delete existing menus, buttons will cascade
+    // Delete existing menus (buttons will cascade)
     await supabase.from('bot_menus').delete().eq('project_id', project.id);
 
     // Delete existing action nodes
@@ -50,9 +39,13 @@ export async function saveProjectToDatabase(project: BotProject, userId?: string
         id: menu.id,
         project_id: project.id,
         name: menu.name,
-        message_text: menu.messageText,
+        message_text: menu.messageText || '',
+        description: menu.description || null,
+        parent_id: menu.parentId || null,
         position_x: menu.position?.x || 0,
         position_y: menu.position?.y || 0,
+        menu_order: menu.order || 0,
+        keyword_triggers: menu.keywordTriggers || [],
         settings: menu.settings || {},
       });
 
@@ -63,47 +56,44 @@ export async function saveProjectToDatabase(project: BotProject, userId?: string
 
       // Save buttons for this menu
       for (const button of menu.buttons) {
-        const buttonData = {
+        const { error: buttonError } = await supabase.from('bot_buttons').insert([{
           id: button.id,
           menu_id: menu.id,
           text: button.text,
-          row_index: button.row,
-          button_order: button.order,
+          row_index: button.row || 0,
+          button_order: button.order || 0,
           target_menu_id: button.targetMenuId || null,
           target_action_id: button.targetActionId || null,
-          label_position: button.labelPosition || null,
-          actions: button.actions || [],
-        };
-        await supabase.from('bot_buttons').insert(buttonData as any);
+          label_position: button.labelPosition || 0.5,
+          actions: JSON.parse(JSON.stringify(button.actions || [])),
+        }]);
+
+        if (buttonError) {
+          console.error('Error saving button:', buttonError);
+        }
       }
     }
 
-    // Save action nodes (first pass - without next_action_id to avoid FK issues)
+    // Save action nodes
     const actionNodes = project.actionNodes || [];
     for (const actionNode of actionNodes) {
-      await supabase.from('bot_action_nodes').insert({
+      const { error: actionError } = await supabase.from('bot_action_nodes').insert({
         id: actionNode.id,
         project_id: project.id,
         action_type: actionNode.type,
-        action_order: 0,
         config: actionNode.config || {},
         position_x: actionNode.position?.x || 0,
         position_y: actionNode.position?.y || 0,
-        next_action_id: null,
+        next_node_id: actionNode.nextNodeId || null,
+        next_node_type: actionNode.nextNodeType || null,
       });
-    }
 
-    // Second pass - update next_action_id
-    for (const actionNode of actionNodes) {
-      if (actionNode.nextNodeId && actionNode.nextNodeType === 'action') {
-        await supabase
-          .from('bot_action_nodes')
-          .update({ next_action_id: actionNode.nextNodeId })
-          .eq('id', actionNode.id);
+      if (actionError) {
+        console.error('Error saving action node:', actionError);
       }
     }
 
-    console.log('Project saved to database:', project.id);
+    console.log('Project saved successfully:', project.id);
     return true;
   } catch (error) {
     console.error('Error saving project to database:', error);
@@ -114,6 +104,8 @@ export async function saveProjectToDatabase(project: BotProject, userId?: string
 // Load project from database
 export async function loadProjectFromDatabase(projectId: string): Promise<BotProject | null> {
   try {
+    console.log('Loading project from database:', projectId);
+
     // Load project
     const { data: projectData, error: projectError } = await supabase
       .from('bot_projects')
@@ -130,7 +122,8 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
     const { data: menusData, error: menusError } = await supabase
       .from('bot_menus')
       .select('*')
-      .eq('project_id', projectId);
+      .eq('project_id', projectId)
+      .order('menu_order', { ascending: true });
 
     if (menusError) {
       console.error('Error loading menus:', menusError);
@@ -139,10 +132,17 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
 
     // Load all buttons for all menus
     const menuIds = menusData?.map(m => m.id) || [];
-    const { data: buttonsData } = await supabase
-      .from('bot_buttons')
-      .select('*')
-      .in('menu_id', menuIds.length > 0 ? menuIds : ['']);
+    let buttonsData: any[] = [];
+    
+    if (menuIds.length > 0) {
+      const { data } = await supabase
+        .from('bot_buttons')
+        .select('*')
+        .in('menu_id', menuIds)
+        .order('row_index', { ascending: true })
+        .order('button_order', { ascending: true });
+      buttonsData = data || [];
+    }
 
     // Load action nodes
     const { data: actionNodesData } = await supabase
@@ -152,7 +152,7 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
 
     // Build menus with buttons
     const menus: BotMenu[] = (menusData || []).map((menu, index) => {
-      const menuButtons: BotButton[] = (buttonsData || [])
+      const menuButtons: BotButton[] = buttonsData
         .filter(b => b.menu_id === menu.id)
         .map(b => ({
           id: b.id,
@@ -169,10 +169,13 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
         id: menu.id,
         name: menu.name,
         messageText: menu.message_text || '',
+        description: menu.description || undefined,
+        parentId: menu.parent_id || undefined,
         buttons: menuButtons,
-        order: index,
+        order: menu.menu_order || index,
         position: { x: menu.position_x || 0, y: menu.position_y || 0 },
-        settings: menu.settings as any,
+        keywordTriggers: menu.keyword_triggers || [],
+        settings: (menu.settings as any) || {},
       };
     });
 
@@ -182,26 +185,36 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
       type: an.action_type as any,
       config: (an.config as Record<string, any>) || {},
       position: { x: an.position_x || 0, y: an.position_y || 0 },
-      nextNodeId: an.next_action_id || undefined,
-      nextNodeType: an.next_action_id ? 'action' as const : undefined,
+      nextNodeId: an.next_node_id || undefined,
+      nextNodeType: an.next_node_type as 'menu' | 'action' | undefined,
     }));
 
-    const settings = projectData.settings as { welcomeMessage: string; defaultMenuId: string } | null;
+    const globalSettings = projectData.global_settings as any || {};
+
+    const validTemplates = ['blank', 'custom', 'shop', 'quiz', 'support', 'funnel'] as const;
+    const template = validTemplates.includes(projectData.template as any) 
+      ? projectData.template as typeof validTemplates[number]
+      : 'blank';
+
+    const validStatuses = ['draft', 'testing', 'exported', 'completed', 'active', 'archived'] as const;
+    const status = validStatuses.includes(projectData.status as any)
+      ? projectData.status as typeof validStatuses[number]
+      : 'draft';
 
     return {
       id: projectData.id,
       name: projectData.name,
+      description: projectData.description || undefined,
+      template,
       menus,
       actionNodes,
-      rootMenuId: settings?.defaultMenuId || menus[0]?.id || '',
+      rootMenuId: projectData.root_menu_id || menus[0]?.id || '',
       telegramBotToken: projectData.telegram_bot_token || undefined,
       telegramBotUsername: projectData.telegram_bot_username || undefined,
-      globalSettings: {
-        welcomeMessage: settings?.welcomeMessage || '',
-      },
+      globalSettings,
       createdAt: new Date(projectData.created_at),
       updatedAt: new Date(projectData.updated_at),
-      status: 'draft',
+      status,
     };
   } catch (error) {
     console.error('Error loading project from database:', error);
@@ -209,9 +222,44 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
   }
 }
 
+// Load all projects for a profile
+export async function loadAllProjectsFromDatabase(profileId: string): Promise<BotProject[]> {
+  try {
+    console.log('Loading all projects for profile:', profileId);
+
+    const { data: projectsData, error } = await supabase
+      .from('bot_projects')
+      .select('*')
+      .eq('profile_id', profileId)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Error loading projects:', error);
+      return [];
+    }
+
+    const projects: BotProject[] = [];
+
+    for (const projectData of projectsData || []) {
+      const project = await loadProjectFromDatabase(projectData.id);
+      if (project) {
+        projects.push(project);
+      }
+    }
+
+    console.log('Loaded', projects.length, 'projects');
+    return projects;
+  } catch (error) {
+    console.error('Error loading all projects:', error);
+    return [];
+  }
+}
+
 // Delete project from database
 export async function deleteProjectFromDatabase(projectId: string): Promise<boolean> {
   try {
+    console.log('Deleting project:', projectId);
+
     const { error } = await supabase
       .from('bot_projects')
       .delete()
@@ -226,34 +274,5 @@ export async function deleteProjectFromDatabase(projectId: string): Promise<bool
   } catch (error) {
     console.error('Error deleting project from database:', error);
     return false;
-  }
-}
-
-// List all projects from database (optionally filtered by user)
-export async function listProjectsFromDatabase(userId?: string): Promise<DbBotProject[]> {
-  try {
-    let query = supabase
-      .from('bot_projects')
-      .select('*')
-      .order('updated_at', { ascending: false });
-
-    if (userId) {
-      query = query.eq('user_id', userId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error listing projects:', error);
-      return [];
-    }
-
-    return (data || []).map(p => ({
-      ...p,
-      settings: (p.settings as { welcomeMessage: string; defaultMenuId: string }) || { welcomeMessage: '', defaultMenuId: '' },
-    }));
-  } catch (error) {
-    console.error('Error listing projects from database:', error);
-    return [];
   }
 }

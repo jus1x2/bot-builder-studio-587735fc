@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { BotProject, BotMenu, BotButton, BotAction, BotActionNode, ActionType, MAX_MENUS_PER_PROJECT, MAX_BUTTONS_PER_MENU, MAX_ACTION_NODES_PER_PROJECT } from '@/types/bot';
 import { createTemplateProject } from '@/lib/bot-templates';
+import { saveProjectToDatabase, loadProjectFromDatabase, loadAllProjectsFromDatabase, deleteProjectFromDatabase } from '@/lib/bot-database-service';
 
 interface ProjectStore {
   projects: BotProject[];
@@ -11,6 +12,13 @@ interface ProjectStore {
   selectedButtonId: string | null;
   selectedActionNodeId: string | null;
   justMovedButtonId: string | null;
+  profileId: string | null;
+  isLoading: boolean;
+  isSyncing: boolean;
+
+  setProfileId: (profileId: string | null) => void;
+  loadProjectsFromCloud: (profileId: string) => Promise<void>;
+  syncProjectToCloud: (projectId: string) => Promise<boolean>;
 
   createProject: (name: string, description?: string, templateId?: string) => BotProject;
   duplicateProject: (projectId: string) => BotProject | null;
@@ -72,6 +80,49 @@ export const useProjectStore = create<ProjectStore>()(
       selectedButtonId: null,
       selectedActionNodeId: null,
       justMovedButtonId: null,
+      profileId: null,
+      isLoading: false,
+      isSyncing: false,
+
+      setProfileId: (profileId) => {
+        set({ profileId });
+      },
+
+      loadProjectsFromCloud: async (profileId) => {
+        set({ isLoading: true });
+        try {
+          const cloudProjects = await loadAllProjectsFromDatabase(profileId);
+          if (cloudProjects.length > 0) {
+            set({ projects: cloudProjects });
+          }
+        } catch (error) {
+          console.error('Failed to load projects from cloud:', error);
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      syncProjectToCloud: async (projectId) => {
+        const { profileId, projects } = get();
+        if (!profileId) {
+          console.warn('No profile ID set, cannot sync to cloud');
+          return false;
+        }
+
+        const project = projects.find(p => p.id === projectId);
+        if (!project) return false;
+
+        set({ isSyncing: true });
+        try {
+          const success = await saveProjectToDatabase(project, profileId);
+          return success;
+        } catch (error) {
+          console.error('Failed to sync project to cloud:', error);
+          return false;
+        } finally {
+          set({ isSyncing: false });
+        }
+      },
 
       createProject: (name, description, templateId = 'blank') => {
         const project = createTemplateProject(templateId, name, description);
@@ -81,6 +132,14 @@ export const useProjectStore = create<ProjectStore>()(
           currentProjectId: project.id,
           currentMenuId: project.rootMenuId,
         }));
+
+        // Sync to cloud if profile is set
+        const { profileId } = get();
+        if (profileId) {
+          setTimeout(() => {
+            get().syncProjectToCloud(project.id);
+          }, 100);
+        }
 
         return project;
       },
@@ -115,10 +174,22 @@ export const useProjectStore = create<ProjectStore>()(
         };
 
         set((state) => ({ projects: [...state.projects, newProject] }));
+
+        // Sync to cloud
+        const { profileId } = get();
+        if (profileId) {
+          setTimeout(() => {
+            get().syncProjectToCloud(newProject.id);
+          }, 100);
+        }
+
         return newProject;
       },
 
       deleteProject: (projectId) => {
+        // Delete from cloud first
+        deleteProjectFromDatabase(projectId).catch(console.error);
+
         set((state) => ({
           projects: state.projects.filter((p) => p.id !== projectId),
           currentProjectId: state.currentProjectId === projectId ? null : state.currentProjectId,
@@ -159,7 +230,6 @@ export const useProjectStore = create<ProjectStore>()(
         const project = get().getCurrentProject();
         if (!project) return null;
 
-        // Check menu limit
         if (project.menus.length >= MAX_MENUS_PER_PROJECT) {
           console.warn(`Maximum menu limit reached (${MAX_MENUS_PER_PROJECT})`);
           return null;
@@ -286,7 +356,6 @@ export const useProjectStore = create<ProjectStore>()(
         const menu = project.menus.find((m) => m.id === menuId);
         if (!menu) return null;
 
-        // Check button limit per menu
         if (menu.buttons.length >= MAX_BUTTONS_PER_MENU) {
           console.warn(`Maximum button limit reached for menu (${MAX_BUTTONS_PER_MENU})`);
           return null;
@@ -597,7 +666,6 @@ export const useProjectStore = create<ProjectStore>()(
         const project = get().getCurrentProject();
         if (!project) return null;
 
-        // Check action node limit
         if ((project.actionNodes || []).length >= MAX_ACTION_NODES_PER_PROJECT) {
           console.warn(`Maximum action node limit reached (${MAX_ACTION_NODES_PER_PROJECT})`);
           return null;

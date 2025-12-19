@@ -100,7 +100,7 @@ export interface BotProject {
   id: string;
   name: string;
   description?: string;
-  template?: 'custom' | 'shop' | 'quiz' | 'support' | 'funnel';
+  template?: 'blank' | 'custom' | 'shop' | 'quiz' | 'support' | 'funnel';
   menus: BotMenu[];
   actionNodes?: BotActionNode[];
   rootMenuId: string;
@@ -108,7 +108,7 @@ export interface BotProject {
   telegramBotUsername?: string;
   createdAt: Date;
   updatedAt: Date;
-  status: 'draft' | 'testing' | 'exported' | 'completed';
+  status: 'draft' | 'testing' | 'exported' | 'completed' | 'active' | 'archived';
   thumbnail?: string;
   globalSettings?: {
     defaultDelay?: number;

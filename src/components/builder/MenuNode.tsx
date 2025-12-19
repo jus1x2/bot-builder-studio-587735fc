@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { Handle, Position, type Node } from '@xyflow/react';
 import { motion } from 'framer-motion';
-import { MessageSquare, Trash2, Edit2, Copy } from 'lucide-react';
+import { MessageSquare, Trash2, Edit2, Copy, Play } from 'lucide-react';
 import { BotMenu, MAX_BUTTONS_PER_ROW } from '@/types/bot';
 
 export interface MenuNodeData extends Record<string, unknown> {
@@ -50,24 +50,34 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
       className={`builder-node node-optimized ${isSelected ? 'selected' : ''}`}
       style={{ minWidth: 220, maxWidth: 280, position: 'relative' }}
     >
-      {!isRoot && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="!w-4 !h-4 !bg-primary !border-[3px] !border-card !rounded-full !shadow-md"
-          style={{ left: -8 }}
-        />
-      )}
+      {/* Target handle for incoming connections - visible on ALL nodes */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        className={`!w-4 !h-4 !border-[3px] !border-card !rounded-full !shadow-md ${
+          isRoot ? '!bg-telegram-green' : '!bg-primary'
+        }`}
+        style={{ left: -8 }}
+      />
+
+      {/* Source handle on the node itself for connections from this menu */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="menu-output"
+        className="!w-4 !h-4 !bg-muted-foreground !border-[3px] !border-card !rounded-full !shadow-md hover:!bg-primary"
+        style={{ right: -8, top: '50%', transform: 'translateY(-50%)' }}
+      />
 
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
             isRoot ? 'bg-telegram-green/20 text-telegram-green' : 'bg-primary/10 text-primary'
           }`}>
-            <MessageSquare className="w-4 h-4" />
+            {isRoot ? <Play className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
           </div>
           <div>
-            <h4 className="text-sm font-medium text-foreground truncate max-w-[160px]">{menu.name}</h4>
+            <h4 className="text-sm font-medium text-foreground truncate max-w-[140px]">{menu.name}</h4>
             <p className="text-xs text-muted-foreground">
               {menu.buttons.length} кнопок
             </p>
@@ -102,7 +112,7 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
 
       <div className="bg-muted/50 rounded-lg p-2.5 mb-3">
         <p className="text-xs text-foreground line-clamp-2">
-          {menu.messageText}
+          {menu.messageText || 'Нет текста сообщения'}
         </p>
       </div>
 
@@ -118,7 +128,7 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
                 {rowButtons.map((button) => {
                   const hasConnection = data.connectedButtonIds
                     ? data.connectedButtonIds.includes(button.id)
-                    : !!button.targetMenuId;
+                    : !!button.targetMenuId || !!button.targetActionId;
                   const isJustMoved = justMovedButtonId === button.id;
 
                     return (
@@ -171,8 +181,16 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
         </div>
       )}
 
+      {/* No buttons placeholder with add hint */}
+      {menu.buttons.length === 0 && (
+        <div className="text-center text-xs text-muted-foreground py-3 bg-muted/30 rounded-lg border-2 border-dashed border-muted">
+          Нажмите для редактирования
+        </div>
+      )}
+
       {isRoot && (
-        <div className="absolute -top-2 -left-2 bg-telegram-green text-primary-foreground text-[10px] font-medium px-2 py-0.5 rounded-full shadow-sm">
+        <div className="absolute -top-2 -left-2 bg-telegram-green text-primary-foreground text-[10px] font-medium px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+          <Play className="w-3 h-3" />
           Старт
         </div>
       )}

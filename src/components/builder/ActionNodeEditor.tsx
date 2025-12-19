@@ -434,19 +434,58 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
         );
 
       case 'random_result':
+        const randomOutcomeCount = actionNode.config.outcomeCount || 2;
         return (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
-                Варианты (через запятую)
+                Количество исходов
               </label>
-              <Textarea
-                value={(actionNode.config.options || []).join(', ')}
-                onChange={(e) => updateConfig('options', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                placeholder="Да, Нет, Может быть"
-                rows={3}
-                className="telegram-input resize-none"
+              <Input
+                type="number"
+                min={2}
+                max={10}
+                value={randomOutcomeCount}
+                onChange={(e) => updateConfig('outcomeCount', Math.max(2, Math.min(10, Number(e.target.value))))}
+                className="telegram-input"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                От 2 до 10 исходов. Каждый исход получает {Math.round(100 / randomOutcomeCount)}% шанс
+              </p>
+            </div>
+            
+            <div className="p-3 rounded-lg bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800/30">
+              <p className="text-sm font-medium text-pink-700 dark:text-pink-300 mb-2">
+                Вероятности исходов:
+              </p>
+              <div className="space-y-1">
+                {Array.from({ length: randomOutcomeCount }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="text-pink-600 dark:text-pink-400">Исход {i + 1}</span>
+                    <span className="font-medium text-pink-700 dark:text-pink-300">
+                      {Math.round(100 / randomOutcomeCount)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-pink-500 dark:text-pink-400 mt-2">
+                💡 Соедините каждый выход с нужным меню на канвасе
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сохранить индекс результата в поле
+              </label>
+              <Input
+                value={actionNode.config.saveToField || ''}
+                onChange={(e) => updateConfig('saveToField', e.target.value)}
+                placeholder="user.random_outcome"
+                className="telegram-input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Сохраняет номер выбранного исхода (0, 1, 2...)
+              </p>
             </div>
           </div>
         );

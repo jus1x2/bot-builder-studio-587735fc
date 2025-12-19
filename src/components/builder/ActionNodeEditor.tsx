@@ -511,8 +511,66 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
           { id: 'outcome-0', weight: 50, label: '' },
           { id: 'outcome-1', weight: 50, label: '' },
         ];
-        const totalWeight = weightedOutcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0);
         const weightedOutcomeCount = weightedOutcomes.length;
+        
+        const distributeEqually = () => {
+          const count = weightedOutcomes.length;
+          const equalWeight = Math.floor(100 / count);
+          const updated = weightedOutcomes.map((o: any, i: number) => ({
+            ...o,
+            weight: i === count - 1 ? 100 - equalWeight * (count - 1) : equalWeight
+          }));
+          updateConfig('outcomes', updated);
+        };
+
+        const updateWeight = (index: number, newWeight: number) => {
+          const clampedWeight = Math.max(1, Math.min(99, newWeight));
+          const oldWeight = weightedOutcomes[index].weight || 50;
+          const diff = clampedWeight - oldWeight;
+          
+          const updated = [...weightedOutcomes];
+          updated[index] = { ...updated[index], weight: clampedWeight };
+          
+          // Distribute the difference among other outcomes
+          const otherIndices = updated.map((_: any, i: number) => i).filter((i: number) => i !== index);
+          const otherTotal = otherIndices.reduce((sum: number, i: number) => sum + (updated[i].weight || 1), 0);
+          
+          if (otherTotal > 0 && diff !== 0) {
+            let remaining = -diff;
+            otherIndices.forEach((i: number, idx: number) => {
+              const proportion = (updated[i].weight || 1) / otherTotal;
+              let change = Math.round(remaining * proportion);
+              
+              if (idx === otherIndices.length - 1) {
+                const usedChange = otherIndices.slice(0, -1).reduce((sum: number, j: number) => {
+                  const prop = (weightedOutcomes[j].weight || 1) / otherTotal;
+                  return sum + Math.round(-diff * prop);
+                }, 0);
+                change = remaining - usedChange;
+              }
+              
+              const newVal = Math.max(1, Math.min(99, (updated[i].weight || 1) + change));
+              updated[i] = { ...updated[i], weight: newVal };
+            });
+          }
+          
+          // Normalize to 100%
+          const total = updated.reduce((s: number, o: any) => s + o.weight, 0);
+          if (total !== 100) {
+            const scale = 100 / total;
+            let sum = 0;
+            updated.forEach((o: any, i: number) => {
+              if (i < updated.length - 1) {
+                o.weight = Math.max(1, Math.round(o.weight * scale));
+                sum += o.weight;
+              } else {
+                o.weight = Math.max(1, 100 - sum);
+              }
+            });
+          }
+          
+          updateConfig('outcomes', updated);
+        };
         
         return (
           <div className="space-y-4">
@@ -521,62 +579,70 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
                 Взвешенный случайный выбор
               </p>
               <p className="text-xs text-orange-600 dark:text-orange-400">
-                Укажите процент для каждого исхода. Проценты автоматически нормализуются.
+                Укажите процент для каждого исхода.
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Количество исходов
-              </label>
-              <Input
-                type="number"
-                min={2}
-                max={10}
-                value={weightedOutcomeCount}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '') return;
-                  const newCount = Math.max(2, Math.min(10, parseInt(val, 10) || 2));
-                  const equalWeight = Math.floor(100 / newCount);
-                  const updated: any[] = [];
-                  
-                  for (let i = 0; i < newCount; i++) {
-                    if (i < weightedOutcomes.length) {
-                      updated.push({ ...weightedOutcomes[i] });
-                    } else {
-                      updated.push({ id: `outcome-${i}`, weight: equalWeight, label: '' });
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Количество исходов
+                </label>
+                <Input
+                  type="number"
+                  min={2}
+                  max={10}
+                  value={weightedOutcomeCount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') return;
+                    const newCount = Math.max(2, Math.min(10, parseInt(val, 10) || 2));
+                    const equalWeight = Math.floor(100 / newCount);
+                    const updated: any[] = [];
+                    
+                    for (let i = 0; i < newCount; i++) {
+                      if (i < weightedOutcomes.length) {
+                        updated.push({ ...weightedOutcomes[i] });
+                      } else {
+                        updated.push({ id: `outcome-${i}`, weight: equalWeight, label: '' });
+                      }
                     }
-                  }
-                  
-                  // Redistribute weights equally
-                  let sum = 0;
-                  updated.forEach((o, i) => {
-                    if (i < updated.length - 1) {
-                      o.weight = equalWeight;
-                      sum += equalWeight;
-                    } else {
-                      o.weight = 100 - sum;
-                    }
-                  });
-                  
-                  updateConfig('outcomes', updated);
-                }}
-                className="telegram-input"
-              />
+                    
+                    let sum = 0;
+                    updated.forEach((o, i) => {
+                      if (i < updated.length - 1) {
+                        o.weight = equalWeight;
+                        sum += equalWeight;
+                      } else {
+                        o.weight = 100 - sum;
+                      }
+                    });
+                    
+                    updateConfig('outcomes', updated);
+                  }}
+                  className="telegram-input"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={distributeEqually}
+                  className="whitespace-nowrap"
+                >
+                  Поровну
+                </Button>
+              </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {weightedOutcomes.map((outcome: any, index: number) => {
+                const colors = ['bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
                 return (
-                  <div key={outcome.id || index} className="p-3 rounded-lg bg-muted/50 border border-border">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-foreground">Исход {index + 1}</span>
-                      <span className="text-xs font-medium text-orange-600 dark:text-orange-400">
-                        {outcome.weight}%
-                      </span>
-                    </div>
-                    <div className="flex gap-2 items-center">
+                  <div key={outcome.id || index} className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${colors[index % colors.length]}`} />
                       <Input
                         value={outcome.label || ''}
                         onChange={(e) => {
@@ -584,63 +650,29 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
                           updated[index] = { ...updated[index], label: e.target.value };
                           updateConfig('outcomes', updated);
                         }}
-                        placeholder={`Название исхода ${index + 1}`}
-                        className="telegram-input flex-1"
+                        placeholder={`Исход ${index + 1}`}
+                        className="telegram-input flex-1 h-8 text-sm"
                       />
+                      <Input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={outcome.weight || 50}
+                        onChange={(e) => updateWeight(index, Number(e.target.value) || 1)}
+                        className="telegram-input w-14 h-8 text-sm text-center"
+                      />
+                      <span className="text-xs text-muted-foreground w-4">%</span>
                       <input
                         type="range"
                         min={1}
                         max={99}
                         value={outcome.weight || 50}
-                        onChange={(e) => {
-                          const newWeight = Number(e.target.value);
-                          const oldWeight = outcome.weight || 50;
-                          const diff = newWeight - oldWeight;
-                          
-                          const updated = [...weightedOutcomes];
-                          updated[index] = { ...updated[index], weight: newWeight };
-                          
-                          // Distribute the difference among other outcomes
-                          const otherIndices = updated.map((_, i) => i).filter(i => i !== index);
-                          const otherTotal = otherIndices.reduce((sum, i) => sum + (updated[i].weight || 1), 0);
-                          
-                          if (otherTotal > 0) {
-                            let remaining = -diff;
-                            otherIndices.forEach((i, idx) => {
-                              const proportion = (updated[i].weight || 1) / otherTotal;
-                              let change = Math.round(remaining * proportion);
-                              
-                              // Last one takes the remainder
-                              if (idx === otherIndices.length - 1) {
-                                change = remaining - otherIndices.slice(0, -1).reduce((sum, j) => {
-                                  const prop = (weightedOutcomes[j].weight || 1) / otherTotal;
-                                  return sum + Math.round(-diff * prop);
-                                }, 0);
-                              }
-                              
-                              const newVal = Math.max(1, Math.min(99, (updated[i].weight || 1) + change));
-                              updated[i] = { ...updated[i], weight: newVal };
-                            });
-                          }
-                          
-                          // Normalize to 100%
-                          const total = updated.reduce((s, o) => s + o.weight, 0);
-                          if (total !== 100) {
-                            const scale = 100 / total;
-                            let sum = 0;
-                            updated.forEach((o, i) => {
-                              if (i < updated.length - 1) {
-                                o.weight = Math.max(1, Math.round(o.weight * scale));
-                                sum += o.weight;
-                              } else {
-                                o.weight = Math.max(1, 100 - sum);
-                              }
-                            });
-                          }
-                          
-                          updateConfig('outcomes', updated);
+                        onChange={(e) => updateWeight(index, Number(e.target.value))}
+                        className="w-20 h-1 accent-orange-500 cursor-pointer"
+                        style={{ 
+                          background: `linear-gradient(to right, hsl(var(--primary)) ${outcome.weight}%, hsl(var(--muted)) ${outcome.weight}%)`,
+                          borderRadius: '4px'
                         }}
-                        className="w-24 accent-orange-500"
                       />
                     </div>
                   </div>
@@ -651,19 +683,18 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
             {/* Visual distribution bar */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
-                Распределение вероятностей
+                Распределение
               </label>
-              <div className="h-6 rounded-lg overflow-hidden flex">
+              <div className="h-5 rounded-md overflow-hidden flex">
                 {weightedOutcomes.map((outcome: any, index: number) => {
-                  const percent = totalWeight > 0 ? (outcome.weight / totalWeight) * 100 : 0;
                   const colors = ['bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
                   return (
                     <div
                       key={outcome.id || index}
-                      className={`${colors[index % colors.length]} flex items-center justify-center text-xs font-medium text-white`}
-                      style={{ width: `${percent}%` }}
+                      className={`${colors[index % colors.length]} flex items-center justify-center text-[10px] font-medium text-white transition-all`}
+                      style={{ width: `${outcome.weight}%` }}
                     >
-                      {percent >= 10 && `${Math.round(percent)}%`}
+                      {outcome.weight >= 12 && `${outcome.weight}%`}
                     </div>
                   );
                 })}

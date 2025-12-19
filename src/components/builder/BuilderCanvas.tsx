@@ -259,6 +259,7 @@ export function BuilderCanvas() {
   const [actionNodeToDelete, setActionNodeToDelete] = useState<{ id: string; name: string } | null>(null);
   const [showActionEditor, setShowActionEditor] = useState(false);
   const [currentViewport, setCurrentViewport] = useState({ x: 100, y: 100, zoom: 0.8 });
+  const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (projectId) setCurrentProject(projectId);
@@ -300,6 +301,7 @@ export function BuilderCanvas() {
         id: menu.id,
         type: 'menuNode',
         position: menu.position || { x: index * 300, y: index * 100 },
+        zIndex: draggedNodeId === menu.id ? 1000 : 1,
         data: {
           menu,
           isSelected: menu.id === currentMenuId,
@@ -324,7 +326,7 @@ export function BuilderCanvas() {
         },
       };
     });
-  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast]);
+  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast, draggedNodeId]);
 
   const actionNodes: Node<ActionNodeData>[] = useMemo(() => {
     if (!project?.actionNodes) return [];
@@ -333,6 +335,7 @@ export function BuilderCanvas() {
       id: actionNode.id,
       type: 'actionNode',
       position: actionNode.position,
+      zIndex: draggedNodeId === actionNode.id ? 1000 : 1,
       data: {
         actionNode,
         isSelected: actionNode.id === selectedActionNodeId,
@@ -351,7 +354,7 @@ export function BuilderCanvas() {
         },
       },
     }));
-  }, [project?.actionNodes, selectedActionNodeId, setSelectedActionNode, duplicateActionNode]);
+  }, [project?.actionNodes, selectedActionNodeId, setSelectedActionNode, duplicateActionNode, draggedNodeId]);
 
   const nodes = useMemo(() => [...menuNodes, ...actionNodes], [menuNodes, actionNodes]);
 
@@ -643,8 +646,16 @@ export function BuilderCanvas() {
     [setCurrentMenu, setSelectedActionNode]
   );
 
+  const handleNodeDragStart = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      setDraggedNodeId(node.id);
+    },
+    []
+  );
+
   const handleNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      setDraggedNodeId(null);
       if (node.type === 'actionNode') {
         updateActionNode(node.id, { position: node.position });
       } else {
@@ -706,6 +717,8 @@ export function BuilderCanvas() {
 
     const NODE_WIDTH = 280;
     const NODE_HEIGHT = 200;
+    const ACTION_NODE_WIDTH = 220;
+    const ACTION_NODE_HEIGHT = 100;
     const HORIZONTAL_GAP = 120;
     const VERTICAL_GAP = 60;
 
@@ -781,12 +794,33 @@ export function BuilderCanvas() {
       }
     });
 
+    // Layout action nodes - place them to the right of menus
+    const actionNodes = project.actionNodes || [];
+    if (actionNodes.length > 0) {
+      const maxMenuLevel = Math.max(...Array.from(levelGroups.keys()));
+      const actionStartX = (maxMenuLevel + 1) * (NODE_WIDTH + HORIZONTAL_GAP) + 150;
+      
+      // Group action nodes by their connections or just arrange in grid
+      const actionsPerRow = 3;
+      actionNodes.forEach((actionNode, index) => {
+        const row = Math.floor(index / actionsPerRow);
+        const col = index % actionsPerRow;
+        
+        updateActionNode(actionNode.id, {
+          position: {
+            x: actionStartX + col * (ACTION_NODE_WIDTH + 40),
+            y: 100 + row * (ACTION_NODE_HEIGHT + 40),
+          }
+        });
+      });
+    }
+
     setNodesKey(k => k + 1);
     toast({
       title: 'Авто-раскладка применена',
-      description: `Размещено ${project.menus.length} меню`,
+      description: `Размещено ${project.menus.length} меню и ${actionNodes.length} действий`,
     });
-  }, [project, updateMenu, toast]);
+  }, [project, updateMenu, updateActionNode, toast]);
 
   const currentMenu = project?.menus.find((m) => m.id === currentMenuId) || null;
 
@@ -829,6 +863,7 @@ export function BuilderCanvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
+        onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
         onEdgeClick={handleEdgeClick}
         onMove={(_, viewport) => setCurrentViewport(viewport)}

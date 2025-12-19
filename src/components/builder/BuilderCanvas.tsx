@@ -260,7 +260,9 @@ export function BuilderCanvas() {
   const [showActionEditor, setShowActionEditor] = useState(false);
   const [currentViewport, setCurrentViewport] = useState({ x: 100, y: 100, zoom: 0.8 });
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
-  const [lastInteractedNodeId, setLastInteractedNodeId] = useState<string | null>(null);
+  // Track z-index order: nodes get increasing zIndex as they are interacted with
+  const zIndexOrderRef = useRef<Map<string, number>>(new Map());
+  const zIndexCounterRef = useRef(1);
 
   useEffect(() => {
     if (projectId) setCurrentProject(projectId);
@@ -323,7 +325,7 @@ export function BuilderCanvas() {
         id: menu.id,
         type: 'menuNode',
         position: menu.position || { x: index * 300, y: index * 100 },
-        zIndex: draggedNodeId === menu.id ? 1000 : (lastInteractedNodeId === menu.id ? 100 : 1),
+        zIndex: draggedNodeId === menu.id ? 1000 : (zIndexOrderRef.current.get(menu.id) || 1),
         data: {
           menu,
           isSelected: menu.id === currentMenuId,
@@ -350,7 +352,7 @@ export function BuilderCanvas() {
         },
       };
     });
-  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast, draggedNodeId, lastInteractedNodeId]);
+  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast, draggedNodeId]);
 
   const actionNodes: Node<ActionNodeData>[] = useMemo(() => {
     if (!project?.actionNodes) return [];
@@ -359,7 +361,7 @@ export function BuilderCanvas() {
       id: actionNode.id,
       type: 'actionNode',
       position: actionNode.position,
-      zIndex: draggedNodeId === actionNode.id ? 1000 : (lastInteractedNodeId === actionNode.id ? 100 : 1),
+      zIndex: draggedNodeId === actionNode.id ? 1000 : (zIndexOrderRef.current.get(actionNode.id) || 1),
       data: {
         actionNode,
         isSelected: actionNode.id === selectedActionNodeId,
@@ -379,7 +381,7 @@ export function BuilderCanvas() {
         },
       },
     }));
-  }, [project?.actionNodes, selectedActionNodeId, setSelectedActionNode, duplicateActionNode, draggedNodeId, lastInteractedNodeId]);
+  }, [project?.actionNodes, selectedActionNodeId, setSelectedActionNode, duplicateActionNode, draggedNodeId]);
 
   const nodes = useMemo(() => [...menuNodes, ...actionNodes], [menuNodes, actionNodes]);
 
@@ -674,7 +676,9 @@ export function BuilderCanvas() {
   const handleNodeDragStart = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setDraggedNodeId(node.id);
-      setLastInteractedNodeId(node.id);
+      // Increment z-index counter and assign to this node
+      zIndexCounterRef.current += 1;
+      zIndexOrderRef.current.set(node.id, zIndexCounterRef.current);
     },
     []
   );

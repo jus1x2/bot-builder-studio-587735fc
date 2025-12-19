@@ -719,52 +719,80 @@ export function BuilderCanvas() {
     const NODE_HEIGHT = 200;
     const ACTION_NODE_WIDTH = 220;
     const ACTION_NODE_HEIGHT = 100;
-    const HORIZONTAL_GAP = 120;
-    const VERTICAL_GAP = 60;
+    const HORIZONTAL_GAP = 150;
+    const VERTICAL_GAP = 80;
 
-    const children = new Map<string, string[]>();
-    const parents = new Map<string, string[]>();
+    // Build parent-child relationships
+    const children = new Map<string, Set<string>>();
+    const parents = new Map<string, Set<string>>();
+    const menuToActions = new Map<string, string[]>();
+    const actionToTarget = new Map<string, { targetId: string; targetType: 'menu' | 'action' }>();
 
     project.menus.forEach(menu => {
-      children.set(menu.id, []);
-      parents.set(menu.id, []);
+      children.set(menu.id, new Set());
+      parents.set(menu.id, new Set());
     });
 
+    // Map menu buttons to their targets
     project.menus.forEach(menu => {
       menu.buttons.forEach(button => {
         if (button.targetMenuId && children.has(button.targetMenuId)) {
-          children.get(menu.id)!.push(button.targetMenuId);
-          parents.get(button.targetMenuId)!.push(menu.id);
+          children.get(menu.id)!.add(button.targetMenuId);
+          parents.get(button.targetMenuId)!.add(menu.id);
+        }
+        if (button.targetActionId) {
+          if (!menuToActions.has(menu.id)) {
+            menuToActions.set(menu.id, []);
+          }
+          menuToActions.get(menu.id)!.push(button.targetActionId);
         }
       });
     });
 
+    // Map action node targets
+    (project.actionNodes || []).forEach(actionNode => {
+      if (actionNode.nextNodeId && actionNode.nextNodeType) {
+        actionToTarget.set(actionNode.id, {
+          targetId: actionNode.nextNodeId,
+          targetType: actionNode.nextNodeType
+        });
+      }
+    });
+
+    // Find root menu (no parents or explicitly set as root)
     const rootId = project.rootMenuId ||
-      project.menus.find(m => parents.get(m.id)!.length === 0)?.id ||
+      project.menus.find(m => parents.get(m.id)!.size === 0)?.id ||
       project.menus[0].id;
 
+    // BFS to assign levels
     const levels = new Map<string, number>();
-    const queue: string[] = [rootId];
-    levels.set(rootId, 0);
-
+    const visited = new Set<string>();
+    const queue: { id: string; level: number }[] = [{ id: rootId, level: 0 }];
+    
     while (queue.length > 0) {
-      const current = queue.shift()!;
-      const currentLevel = levels.get(current)!;
+      const { id, level } = queue.shift()!;
+      
+      if (visited.has(id)) continue;
+      visited.add(id);
+      levels.set(id, level);
 
-      children.get(current)?.forEach(childId => {
-        if (!levels.has(childId)) {
-          levels.set(childId, currentLevel + 1);
-          queue.push(childId);
+      // Add children to queue
+      children.get(id)?.forEach(childId => {
+        if (!visited.has(childId)) {
+          queue.push({ id: childId, level: level + 1 });
         }
       });
     }
 
+    // Handle unvisited menus (orphans) - place them at the end
+    let maxLevel = Math.max(...Array.from(levels.values()), 0);
     project.menus.forEach((menu, idx) => {
       if (!levels.has(menu.id)) {
-        levels.set(menu.id, Math.floor(idx / 3));
+        levels.set(menu.id, maxLevel + 1 + Math.floor(idx / 3));
       }
     });
 
+    // Group menus by level
     const levelGroups = new Map<number, string[]>();
     levels.forEach((level, id) => {
       if (!levelGroups.has(level)) {
@@ -773,20 +801,50 @@ export function BuilderCanvas() {
       levelGroups.get(level)!.push(id);
     });
 
+    // Sort menus within each level by their parent's position for better alignment
+    levelGroups.forEach((menuIds, level) => {
+      if (level === 0) return;
+      
+      menuIds.sort((a, b) => {
+        const parentsA = Array.from(parents.get(a) || []);
+        const parentsB = Array.from(parents.get(b) || []);
+        
+        const parentPosA = parentsA.length > 0 ? 
+          (levelGroups.get(level - 1)?.indexOf(parentsA[0]) ?? 0) : 0;
+        const parentPosB = parentsB.length > 0 ? 
+          (levelGroups.get(level - 1)?.indexOf(parentsB[0]) ?? 0) : 0;
+        
+        return parentPosA - parentPosB;
+      });
+    });
+
+    // Calculate positions - center each level vertically
     const positions = new Map<string, { x: number; y: number }>();
 
+    // Find max height needed
+    let maxNodesInLevel = 0;
+    levelGroups.forEach(nodeIds => {
+      if (nodeIds.length > maxNodesInLevel) {
+        maxNodesInLevel = nodeIds.length;
+      }
+    });
+    
+    const totalHeight = maxNodesInLevel * (NODE_HEIGHT + VERTICAL_GAP);
+    const centerY = totalHeight / 2;
+
     levelGroups.forEach((nodeIds, level) => {
-      const totalHeight = nodeIds.length * NODE_HEIGHT + (nodeIds.length - 1) * VERTICAL_GAP;
-      const startY = -totalHeight / 2 + NODE_HEIGHT / 2;
+      const levelHeight = nodeIds.length * NODE_HEIGHT + (nodeIds.length - 1) * VERTICAL_GAP;
+      const startY = centerY - levelHeight / 2;
 
       nodeIds.forEach((id, index) => {
         positions.set(id, {
-          x: level * (NODE_WIDTH + HORIZONTAL_GAP) + 100,
-          y: startY + index * (NODE_HEIGHT + VERTICAL_GAP) + 200,
+          x: 100 + level * (NODE_WIDTH + HORIZONTAL_GAP),
+          y: startY + index * (NODE_HEIGHT + VERTICAL_GAP),
         });
       });
     });
 
+    // Apply positions to menus
     project.menus.forEach(menu => {
       const pos = positions.get(menu.id);
       if (pos) {
@@ -794,24 +852,63 @@ export function BuilderCanvas() {
       }
     });
 
-    // Layout action nodes - place them to the right of menus
+    // Layout action nodes - place them relative to connected menus
     const actionNodes = project.actionNodes || [];
     if (actionNodes.length > 0) {
       const maxMenuLevel = Math.max(...Array.from(levelGroups.keys()));
-      const actionStartX = (maxMenuLevel + 1) * (NODE_WIDTH + HORIZONTAL_GAP) + 150;
+      const actionStartX = (maxMenuLevel + 1) * (NODE_WIDTH + HORIZONTAL_GAP) + 100;
       
-      // Group action nodes by their connections or just arrange in grid
-      const actionsPerRow = 3;
-      actionNodes.forEach((actionNode, index) => {
-        const row = Math.floor(index / actionsPerRow);
-        const col = index % actionsPerRow;
+      // Group actions by their source menu
+      const actionsBySourceMenu = new Map<string, string[]>();
+      const orphanActions: string[] = [];
+      
+      actionNodes.forEach(actionNode => {
+        const sourceMenu = Array.from(menuToActions.entries())
+          .find(([_, actions]) => actions.includes(actionNode.id));
         
-        updateActionNode(actionNode.id, {
-          position: {
-            x: actionStartX + col * (ACTION_NODE_WIDTH + 40),
-            y: 100 + row * (ACTION_NODE_HEIGHT + 40),
+        if (sourceMenu) {
+          if (!actionsBySourceMenu.has(sourceMenu[0])) {
+            actionsBySourceMenu.set(sourceMenu[0], []);
+          }
+          actionsBySourceMenu.get(sourceMenu[0])!.push(actionNode.id);
+        } else {
+          orphanActions.push(actionNode.id);
+        }
+      });
+
+      // Position actions near their source menus
+      let globalActionY = 100;
+      
+      actionsBySourceMenu.forEach((actionIds, menuId) => {
+        const menuPos = positions.get(menuId);
+        const baseY = menuPos?.y ?? globalActionY;
+        
+        actionIds.forEach((actionId, idx) => {
+          const actionNode = actionNodes.find(a => a.id === actionId);
+          if (actionNode) {
+            updateActionNode(actionNode.id, {
+              position: {
+                x: actionStartX,
+                y: baseY + idx * (ACTION_NODE_HEIGHT + 30),
+              }
+            });
           }
         });
+        
+        globalActionY = Math.max(globalActionY, baseY + actionIds.length * (ACTION_NODE_HEIGHT + 30));
+      });
+      
+      // Position orphan actions
+      orphanActions.forEach((actionId, idx) => {
+        const actionNode = actionNodes.find(a => a.id === actionId);
+        if (actionNode) {
+          updateActionNode(actionNode.id, {
+            position: {
+              x: actionStartX + ACTION_NODE_WIDTH + 50,
+              y: 100 + idx * (ACTION_NODE_HEIGHT + 30),
+            }
+          });
+        }
       });
     }
 

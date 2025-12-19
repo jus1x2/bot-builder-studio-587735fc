@@ -20,7 +20,7 @@ const getWebhookUrl = (projectId: string) =>
 
 export function TelegramConnectModal({ isOpen, onClose }: TelegramConnectModalProps) {
   const { toast } = useToast();
-  const { getCurrentProject, updateProject } = useProjectStore();
+  const { getCurrentProject, updateProject, syncProjectToCloud, profileId } = useProjectStore();
   const project = getCurrentProject();
 
   const [step, setStep] = useState<Step>('token');
@@ -69,8 +69,25 @@ export function TelegramConnectModal({ isOpen, onClose }: TelegramConnectModalPr
             telegramBotUsername: data.result.username,
           });
 
+          // Force sync to cloud - this is critical for webhook to work!
+          console.log('[TelegramConnect] Force syncing project to cloud...');
+          const syncSuccess = await syncProjectToCloud(project.id);
+          
+          if (!syncSuccess) {
+            console.error('[TelegramConnect] Failed to sync project to cloud');
+            toast({
+              title: 'Предупреждение',
+              description: 'Проект не синхронизирован с облаком. Бот может не работать.',
+              variant: 'destructive',
+            });
+          } else {
+            console.log('[TelegramConnect] Project synced to cloud successfully');
+          }
+
           // Set up webhook with Telegram
           const webhookUrl = getWebhookUrl(project.id);
+          console.log('[TelegramConnect] Setting webhook URL:', webhookUrl);
+          
           const webhookResponse = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -80,6 +97,8 @@ export function TelegramConnectModal({ isOpen, onClose }: TelegramConnectModalPr
           
           if (!webhookData.ok) {
             console.warn('Failed to set webhook:', webhookData);
+          } else {
+            console.log('[TelegramConnect] Webhook set successfully');
           }
         }
 

@@ -343,6 +343,32 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0 overflow-y-auto p-4 space-y-3"
           >
+            {/* Media preview */}
+            {menu.mediaUrl && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                transition={{ delay: 0.05 }} 
+                className="max-w-[85%]"
+              >
+                {menu.mediaUrl.includes('.mp4') || menu.mediaUrl.includes('.webm') ? (
+                  <video 
+                    src={menu.mediaUrl}
+                    className="w-full rounded-2xl rounded-tl-md shadow-sm"
+                    controls
+                    playsInline
+                  />
+                ) : (
+                  <img 
+                    src={menu.mediaUrl} 
+                    alt="" 
+                    className="w-full rounded-2xl rounded-tl-md shadow-sm object-cover max-h-48"
+                    onError={(e) => (e.target as HTMLImageElement).style.display = 'none'}
+                  />
+                )}
+              </motion.div>
+            )}
+
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="max-w-[85%]">
               <div className="bg-card rounded-2xl rounded-tl-md px-4 py-3 shadow-sm min-h-[40px]">
                 <div className="text-sm text-foreground">

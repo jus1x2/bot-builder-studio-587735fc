@@ -369,7 +369,7 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
           delay * 1000
         );
         
-        // In preview, limit to max 5 seconds for demo purposes
+        // Limit preview delay to max 5 seconds for faster testing
         const previewDelay = Math.min(delayMs, 5000);
         
         setActionMessages(prev => [...prev, { 
@@ -426,8 +426,8 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         const title = actionNode.config.title || '🏆 Топ игроков';
         const limit = actionNode.config.limit || 10;
         
-        // Generate demo leaderboard
-        const demoPlayers = [
+        // Generate sample leaderboard for preview
+        const samplePlayers = [
           { name: 'Александр', score: 1520 },
           { name: 'Мария', score: 1380 },
           { name: 'Дмитрий', score: 1250 },
@@ -436,7 +436,7 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         ].slice(0, Math.min(limit, 5));
         
         let leaderboardText = `${title}\n\n`;
-        demoPlayers.forEach((player, i) => {
+        samplePlayers.forEach((player, i) => {
           const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
           leaderboardText += `${medal} ${player.name} — ${player.score} очков\n`;
         });
@@ -462,11 +462,22 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
           text: `⭐ Баллы: ${opText}${points}`, 
           type: 'bot' 
         }]);
-        break;
+        return getNextNode();
       }
       case 'spam_protection': {
-        // In preview, spam protection just passes through (simulates successful check)
-        // No message shown - action is a silent gate that allows continuation
+        // Spam protection passes through silently (successful check)
+        return getNextNode();
+      }
+      case 'send_notification': {
+        const message = actionNode.config.message || 'Уведомление';
+        const silent = actionNode.config.silent === true;
+        const interpolated = interpolateVariables(message, userContext);
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🔔 ${interpolated}${silent ? ' (без звука)' : ''}`, 
+          type: 'bot' 
+        }]);
         return getNextNode();
       }
     }

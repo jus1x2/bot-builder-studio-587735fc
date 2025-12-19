@@ -1442,6 +1442,7 @@ export function ActionConfigurator({ action, menus, onChange, onClose, onSave }:
           { id: 'outcome-1', weight: 50, label: '' },
         ];
         const totalWeight = weightedOutcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0);
+        const weightedOutcomeCount = weightedOutcomes.length;
         
         return (
           <div className="space-y-4">
@@ -1450,8 +1451,37 @@ export function ActionConfigurator({ action, menus, onChange, onClose, onSave }:
                 Взвешенный случайный выбор
               </p>
               <p className="text-xs text-orange-600 dark:text-orange-400">
-                Укажите вес для каждого исхода. Чем больше вес, тем выше шанс.
+                Укажите процент для каждого исхода. Проценты автоматически нормализуются.
               </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Количество исходов
+              </label>
+              <Input
+                type="number"
+                min={2}
+                max={10}
+                value={weightedOutcomeCount}
+                onChange={(e) => {
+                  const newCount = Math.max(2, Math.min(10, Number(e.target.value)));
+                  let updated = [...weightedOutcomes];
+                  
+                  if (newCount > updated.length) {
+                    // Add new outcomes with equal distribution
+                    const remainingPercent = 100 - updated.reduce((s, o) => s + (o.weight || 0), 0);
+                    const newWeight = Math.max(10, Math.round(remainingPercent / (newCount - updated.length)));
+                    for (let i = updated.length; i < newCount; i++) {
+                      updated.push({ id: `outcome-${i}`, weight: newWeight, label: '' });
+                    }
+                  } else if (newCount < updated.length) {
+                    updated = updated.slice(0, newCount);
+                  }
+                  updateConfig('outcomes', updated);
+                }}
+                className="telegram-input"
+              />
             </div>
 
             <div className="space-y-3">
@@ -1461,8 +1491,8 @@ export function ActionConfigurator({ action, menus, onChange, onClose, onSave }:
                   <div key={outcome.id || index} className="p-3 rounded-lg bg-muted/50 border border-border">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-foreground">Исход {index + 1}</span>
-                      <span className="text-xs font-medium text-orange-600 dark:text-orange-400">
-                        {percent}%
+                      <span className="text-xs text-muted-foreground">
+                        Итоговый: <span className="font-medium text-orange-600 dark:text-orange-400">{percent}%</span>
                       </span>
                     </div>
                     <div className="flex gap-2">
@@ -1477,56 +1507,27 @@ export function ActionConfigurator({ action, menus, onChange, onClose, onSave }:
                         placeholder={`Название исхода ${index + 1}`}
                         className="telegram-input flex-1"
                       />
-                      <Input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={outcome.weight || 1}
-                        onChange={(e) => {
-                          const updated = weightedOutcomes.map((o: any, i: number) =>
-                            i === index ? { ...o, weight: Math.max(1, Number(e.target.value)) } : o
-                          );
-                          updateConfig('outcomes', updated);
-                        }}
-                        className="telegram-input w-20"
-                        placeholder="Вес"
-                      />
-                      {weightedOutcomes.length > 2 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            const updated = weightedOutcomes.filter((_: any, i: number) => i !== index);
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={outcome.weight || 1}
+                          onChange={(e) => {
+                            const updated = weightedOutcomes.map((o: any, i: number) =>
+                              i === index ? { ...o, weight: Math.max(1, Math.min(100, Number(e.target.value))) } : o
+                            );
                             updateConfig('outcomes', updated);
                           }}
-                        >
-                          <Trash className="w-4 h-4" />
-                        </Button>
-                      )}
+                          className="telegram-input w-20 pr-6"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            {weightedOutcomes.length < 10 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  const newOutcome = { 
-                    id: `outcome-${weightedOutcomes.length}`, 
-                    weight: 10, 
-                    label: '' 
-                  };
-                  updateConfig('outcomes', [...weightedOutcomes, newOutcome]);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Добавить исход
-              </Button>
-            )}
 
             <div className="p-3 rounded-lg bg-muted/30 border border-border">
               <p className="text-xs text-muted-foreground mb-2">Распределение вероятностей:</p>
@@ -1543,7 +1544,7 @@ export function ActionConfigurator({ action, menus, onChange, onClose, onSave }:
                       key={outcome.id || index}
                       className={`${colors[index % colors.length]} flex items-center justify-center`}
                       style={{ width: `${percent}%` }}
-                      title={`Исход ${index + 1}: ${Math.round(percent)}%`}
+                      title={`${outcome.label || `Исход ${index + 1}`}: ${Math.round(percent)}%`}
                     >
                       {percent > 10 && (
                         <span className="text-[9px] font-bold text-white">{Math.round(percent)}%</span>

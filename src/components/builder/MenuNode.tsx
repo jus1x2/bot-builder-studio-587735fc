@@ -40,7 +40,8 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
   }, [menu.buttons]);
 
   const sortedRows = Object.keys(buttonRows).map(Number).sort((a, b) => a - b);
-  const visibleRows = sortedRows.slice(0, 4);
+  // Show first 6 rows in preview, rest collapsed
+  const visibleRows = sortedRows.slice(0, 6);
   const hiddenRowsCount = sortedRows.length - visibleRows.length;
 
   return (
@@ -138,9 +139,10 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
                         return (
                           <div
                             key={button.id}
-                            className={`flex-1 relative transition-all duration-300 ease-out ${
-                              isJustMoved ? 'scale-110 z-10' : 'scale-100'
+                            className={`flex-1 relative transition-all duration-300 ease-out pr-3 ${
+                              isJustMoved ? 'scale-105 z-10' : 'scale-100'
                             }`}
+                            style={{ minWidth: 0 }}
                           >
                             <div
                               className={`text-[10px] font-semibold px-2 py-1.5 rounded-md text-center truncate border transition-all duration-300 ease-out ${
@@ -155,18 +157,18 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
                             >
                               {button.text}
                             </div>
-                            {/* Source handle on each button for connections to other menus/actions */}
+                            {/* Source handle on each button - visible outside the button */}
                             <Handle
                               type="source"
                               position={Position.Right}
                               id={button.id}
-                              className={`!w-3.5 !h-3.5 !border-[2px] !border-card !rounded-full !shadow-md transition-all ${
+                              className={`!w-3 !h-3 !border-[2px] !border-card !rounded-full !shadow-md transition-all ${
                                 hasConnection
                                   ? '!bg-telegram-green'
                                   : '!bg-primary hover:!bg-primary hover:!scale-125'
                               }`}
                               style={{
-                                right: -7,
+                                right: 0,
                                 top: '50%',
                                 transform: 'translateY(-50%)',
                               }}
@@ -186,9 +188,12 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
             </div>
           )}
 
-          {/* No buttons placeholder */}
+          {/* No buttons placeholder - clickable */}
           {menu.buttons.length === 0 && (
-            <div className="text-center text-xs text-muted-foreground py-3 bg-muted/30 rounded-lg border-2 border-dashed border-muted">
+            <div 
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className="text-center text-xs text-muted-foreground py-3 bg-muted/30 rounded-lg border-2 border-dashed border-muted hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-colors"
+            >
               Нажмите для редактирования
             </div>
           )}

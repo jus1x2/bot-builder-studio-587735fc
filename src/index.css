@@ -358,16 +358,19 @@ html, body {
 /* Cuttable edge hover effect */
 .react-flow__edge-interaction {
   cursor: pointer;
-  transition: stroke 0.2s ease;
+  transition: stroke 0.3s ease, opacity 0.3s ease;
 }
 
 .react-flow__edge-interaction:hover {
-  stroke: hsl(var(--destructive) / 0.4) !important;
+  stroke: hsl(var(--destructive) / 0.2) !important;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
   stroke: hsl(var(--destructive)) !important;
-  filter: drop-shadow(0 0 4px hsl(var(--destructive) / 0.5));
+  filter: drop-shadow(0 0 6px hsl(var(--destructive) / 0.4));
+  transition: stroke 0.3s ease, filter 0.3s ease;
 }
 
 .react-flow__controls {

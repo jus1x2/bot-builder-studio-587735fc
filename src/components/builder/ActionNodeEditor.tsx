@@ -557,10 +557,10 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
 
             <div className="flex items-center justify-between">
               <label className="text-sm text-foreground">
-                Показывать уведомление о результате
+                Показывать сообщение в чате
               </label>
               <Switch
-                checked={actionNode.config.showNotification !== false}
+                checked={actionNode.config.showNotification === true}
                 onCheckedChange={(checked) => updateConfig('showNotification', checked)}
               />
             </div>
@@ -607,19 +607,22 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
           const updated = [...weightedOutcomes];
           updated[index] = { ...updated[index], weight: clampedWeight };
           
-          // Distribute the difference among other outcomes
-          const otherIndices = updated.map((_: any, i: number) => i).filter((i: number) => i !== index);
-          const otherTotal = otherIndices.reduce((sum: number, i: number) => sum + (updated[i].weight || 1), 0);
+          // Get unlocked indices (excluding current and locked ones)
+          const unlockedIndices = updated
+            .map((_: any, i: number) => i)
+            .filter((i: number) => i !== index && !updated[i].locked);
           
-          if (otherTotal > 0 && diff !== 0) {
+          const unlockedTotal = unlockedIndices.reduce((sum: number, i: number) => sum + (updated[i].weight || 1), 0);
+          
+          if (unlockedTotal > 0 && diff !== 0) {
             let remaining = -diff;
-            otherIndices.forEach((i: number, idx: number) => {
-              const proportion = (updated[i].weight || 1) / otherTotal;
+            unlockedIndices.forEach((i: number, idx: number) => {
+              const proportion = (updated[i].weight || 1) / unlockedTotal;
               let change = Math.round(remaining * proportion);
               
-              if (idx === otherIndices.length - 1) {
-                const usedChange = otherIndices.slice(0, -1).reduce((sum: number, j: number) => {
-                  const prop = (weightedOutcomes[j].weight || 1) / otherTotal;
+              if (idx === unlockedIndices.length - 1) {
+                const usedChange = unlockedIndices.slice(0, -1).reduce((sum: number, j: number) => {
+                  const prop = (weightedOutcomes[j].weight || 1) / unlockedTotal;
                   return sum + Math.round(-diff * prop);
                 }, 0);
                 change = remaining - usedChange;
@@ -632,19 +635,31 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
           
           // Normalize to 100%
           const total = updated.reduce((s: number, o: any) => s + o.weight, 0);
-          if (total !== 100) {
-            const scale = 100 / total;
-            let sum = 0;
-            updated.forEach((o: any, i: number) => {
-              if (i < updated.length - 1) {
-                o.weight = Math.max(1, Math.round(o.weight * scale));
-                sum += o.weight;
-              } else {
-                o.weight = Math.max(1, 100 - sum);
-              }
-            });
+          if (total !== 100 && unlockedIndices.length > 0) {
+            const lockedSum = updated.reduce((s: number, o: any, i: number) => 
+              o.locked || i === index ? s + o.weight : s, 0);
+            const remainder = 100 - lockedSum;
+            
+            if (remainder > 0) {
+              const scale = remainder / unlockedIndices.reduce((s: number, i: number) => s + updated[i].weight, 0);
+              let sum = 0;
+              unlockedIndices.forEach((i: number, idx: number) => {
+                if (idx < unlockedIndices.length - 1) {
+                  updated[i].weight = Math.max(1, Math.round(updated[i].weight * scale));
+                  sum += updated[i].weight;
+                } else {
+                  updated[i].weight = Math.max(1, remainder - sum);
+                }
+              });
+            }
           }
           
+          updateConfig('outcomes', updated);
+        };
+
+        const toggleLock = (index: number) => {
+          const updated = [...weightedOutcomes];
+          updated[index] = { ...updated[index], locked: !updated[index].locked };
           updateConfig('outcomes', updated);
         };
         
@@ -715,9 +730,22 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
             <div className="space-y-2">
               {weightedOutcomes.map((outcome: any, index: number) => {
                 const colors = ['bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
+                const isLocked = outcome.locked;
                 return (
-                  <div key={outcome.id || index} className="p-2 rounded-lg bg-muted/30 border border-border">
+                  <div key={outcome.id || index} className={`p-2 rounded-lg border ${isLocked ? 'bg-muted/60 border-primary/30' : 'bg-muted/30 border-border'}`}>
                     <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleLock(index)}
+                        className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                          isLocked 
+                            ? 'bg-primary/20 text-primary' 
+                            : 'bg-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                        title={isLocked ? 'Разблокировать' : 'Закрепить значение'}
+                      >
+                        {isLocked ? '🔒' : '🔓'}
+                      </button>
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors[index % colors.length]}`} />
                       <Input
                         value={outcome.label || ''}
@@ -735,7 +763,8 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
                         max={99}
                         value={outcome.weight || 50}
                         onChange={(e) => updateWeight(index, Number(e.target.value) || 1)}
-                        className="telegram-input w-16 h-7 text-sm text-center px-1"
+                        disabled={isLocked}
+                        className={`telegram-input w-16 h-7 text-sm text-center px-1 ${isLocked ? 'opacity-60' : ''}`}
                       />
                       <span className="text-xs text-muted-foreground">%</span>
                       <input
@@ -744,7 +773,8 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
                         max={99}
                         value={outcome.weight || 50}
                         onChange={(e) => updateWeight(index, Number(e.target.value))}
-                        className="w-16 h-1.5 rounded-full appearance-none cursor-pointer"
+                        disabled={isLocked}
+                        className={`w-16 h-1.5 rounded-full appearance-none cursor-pointer ${isLocked ? 'opacity-40' : ''}`}
                         style={{ 
                           background: `linear-gradient(to right, hsl(24 95% 53%) ${outcome.weight}%, hsl(var(--muted)) ${outcome.weight}%)`
                         }}
@@ -778,10 +808,10 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
 
             <div className="flex items-center justify-between">
               <label className="text-sm text-foreground">
-                Показывать уведомление о результате
+                Показывать сообщение в чате
               </label>
               <Switch
-                checked={actionNode.config.showNotification !== false}
+                checked={actionNode.config.showNotification === true}
                 onCheckedChange={(checked) => updateConfig('showNotification', checked)}
               />
             </div>

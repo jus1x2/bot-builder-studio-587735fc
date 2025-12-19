@@ -344,6 +344,7 @@ html, body {
 /* React Flow customization */
 .react-flow__node {
   @apply !bg-transparent;
+  transition: z-index 0.15s ease-out, transform 0.1s ease-out;
 }
 
 .react-flow__edge-path {

@@ -720,7 +720,6 @@ export function BuilderCanvas() {
 
     const NODE_WIDTH = 280;
     const NODE_HEIGHT = 180;
-    const ACTION_NODE_WIDTH = 200;
     const ACTION_NODE_HEIGHT = 90;
     const HORIZONTAL_GAP = 100;
     const VERTICAL_GAP = 50;
@@ -756,7 +755,7 @@ export function BuilderCanvas() {
       project.menus.find(m => parents.get(m.id)!.size === 0)?.id ||
       project.menus[0].id;
 
-    // BFS to assign levels for connected menus
+    // BFS to assign levels for connected menus ONLY
     const levels = new Map<string, number>();
     const visited = new Set<string>();
     const queue: { id: string; level: number }[] = [{ id: rootId, level: 0 }];
@@ -776,16 +775,10 @@ export function BuilderCanvas() {
       });
     }
 
-    // Handle unvisited menus (orphans) - place them in a separate column after all connected menus
-    const connectedMaxLevel = levels.size > 0 ? Math.max(...Array.from(levels.values())) : -1;
-    const orphanMenus = project.menus.filter(menu => !levels.has(menu.id));
-    
-    // Place orphans in their own level(s), grouped vertically
-    orphanMenus.forEach((menu, idx) => {
-      levels.set(menu.id, connectedMaxLevel + 1 + Math.floor(idx / 4));
-    });
+    // Skip orphan menus - don't touch them at all
+    const connectedMenuIds = new Set(levels.keys());
 
-    // Group menus by level
+    // Group connected menus by level
     const levelGroups = new Map<number, string[]>();
     levels.forEach((level, id) => {
       if (!levelGroups.has(level)) {
@@ -794,7 +787,7 @@ export function BuilderCanvas() {
       levelGroups.get(level)!.push(id);
     });
 
-    // Sort menus within each level by their parent's position for better alignment
+    // Sort menus within each level by their parent's position
     levelGroups.forEach((menuIds, level) => {
       if (level === 0) return;
       
@@ -810,7 +803,7 @@ export function BuilderCanvas() {
       });
     });
 
-    // Calculate positions - more compact layout
+    // Calculate positions for connected menus only
     const positions = new Map<string, { x: number; y: number }>();
 
     levelGroups.forEach((nodeIds, level) => {
@@ -822,70 +815,48 @@ export function BuilderCanvas() {
       });
     });
 
-    // Apply positions to menus
+    // Apply positions only to connected menus
+    let layoutCount = 0;
     project.menus.forEach(menu => {
-      const pos = positions.get(menu.id);
-      if (pos) {
-        updateMenu(menu.id, { position: pos });
+      if (connectedMenuIds.has(menu.id)) {
+        const pos = positions.get(menu.id);
+        if (pos) {
+          updateMenu(menu.id, { position: pos });
+          layoutCount++;
+        }
       }
     });
 
-    // Layout action nodes - place them relative to connected menus
+    // Layout only connected action nodes
     const actionNodes = project.actionNodes || [];
+    let actionLayoutCount = 0;
+    
     if (actionNodes.length > 0) {
-      const maxMenuLevel = Math.max(...Array.from(levelGroups.keys()));
+      const maxMenuLevel = levelGroups.size > 0 ? Math.max(...Array.from(levelGroups.keys())) : 0;
       const actionStartX = (maxMenuLevel + 1) * (NODE_WIDTH + HORIZONTAL_GAP) + 50;
       
-      // Group actions by their source menu
-      const actionsBySourceMenu = new Map<string, string[]>();
-      const orphanActions: string[] = [];
+      // Only layout actions connected to laid-out menus
+      const connectedActions: string[] = [];
       
-      actionNodes.forEach(actionNode => {
-        const sourceMenu = Array.from(menuToActions.entries())
-          .find(([_, actions]) => actions.includes(actionNode.id));
-        
-        if (sourceMenu) {
-          if (!actionsBySourceMenu.has(sourceMenu[0])) {
-            actionsBySourceMenu.set(sourceMenu[0], []);
-          }
-          actionsBySourceMenu.get(sourceMenu[0])!.push(actionNode.id);
-        } else {
-          orphanActions.push(actionNode.id);
+      menuToActions.forEach((actionIds, menuId) => {
+        if (connectedMenuIds.has(menuId)) {
+          connectedActions.push(...actionIds);
         }
       });
 
-      // Position actions near their source menus
-      let globalActionY = 50;
-      
-      actionsBySourceMenu.forEach((actionIds, menuId) => {
-        const menuPos = positions.get(menuId);
-        const baseY = menuPos?.y ?? globalActionY;
-        
-        actionIds.forEach((actionId, idx) => {
-          const actionNode = actionNodes.find(a => a.id === actionId);
-          if (actionNode) {
-            updateActionNode(actionNode.id, {
-              position: {
-                x: actionStartX,
-                y: baseY + idx * (ACTION_NODE_HEIGHT + 20),
-              }
-            });
-          }
-        });
-        
-        globalActionY = Math.max(globalActionY, baseY + actionIds.length * (ACTION_NODE_HEIGHT + 20));
-      });
-      
-      // Position orphan actions below connected actions
-      orphanActions.forEach((actionId, idx) => {
+      // Position connected actions
+      let actionY = 50;
+      connectedActions.forEach((actionId) => {
         const actionNode = actionNodes.find(a => a.id === actionId);
         if (actionNode) {
           updateActionNode(actionNode.id, {
             position: {
               x: actionStartX,
-              y: globalActionY + 30 + idx * (ACTION_NODE_HEIGHT + 20),
+              y: actionY,
             }
           });
+          actionY += ACTION_NODE_HEIGHT + 20;
+          actionLayoutCount++;
         }
       });
     }
@@ -893,7 +864,7 @@ export function BuilderCanvas() {
     setNodesKey(k => k + 1);
     toast({
       title: 'Авто-раскладка применена',
-      description: `Размещено ${project.menus.length} меню и ${actionNodes.length} действий`,
+      description: `Размещено ${layoutCount} меню и ${actionLayoutCount} действий`,
     });
   }, [project, updateMenu, updateActionNode, toast]);
 

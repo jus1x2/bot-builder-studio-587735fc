@@ -181,6 +181,71 @@ export type Database = {
           },
         ]
       }
+      bot_products: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          max_quantity: number | null
+          name: string
+          old_price: number | null
+          price: number
+          project_id: string
+          sku: string | null
+          sort_order: number | null
+          stock: number | null
+          updated_at: string
+          variants: string[] | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          max_quantity?: number | null
+          name: string
+          old_price?: number | null
+          price?: number
+          project_id: string
+          sku?: string | null
+          sort_order?: number | null
+          stock?: number | null
+          updated_at?: string
+          variants?: string[] | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          max_quantity?: number | null
+          name?: string
+          old_price?: number | null
+          price?: number
+          project_id?: string
+          sku?: string | null
+          sort_order?: number | null
+          stock?: number | null
+          updated_at?: string
+          variants?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_products_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "bot_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bot_projects: {
         Row: {
           created_at: string

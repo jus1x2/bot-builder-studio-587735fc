@@ -87,7 +87,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     if (!isShowProduct) return null;
     
     const { productName, price, oldPrice, imageUrl } = actionNode.config;
-    const hasContent = productName || price;
+    const hasContent = productName || (price !== undefined && price !== null && price !== '');
     
     if (!hasContent) {
       return (

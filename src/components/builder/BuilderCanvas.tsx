@@ -357,31 +357,57 @@ export function BuilderCanvas() {
   const actionNodes: Node<ActionNodeData>[] = useMemo(() => {
     if (!project?.actionNodes) return [];
 
-    return project.actionNodes.map((actionNode) => ({
-      id: actionNode.id,
-      type: 'actionNode',
-      position: actionNode.position,
-      zIndex: draggedNodeId === actionNode.id ? 1000 : (zIndexOrderRef.current.get(actionNode.id) || 1),
-      data: {
-        actionNode,
-        isSelected: actionNode.id === selectedActionNodeId,
-        isDragging: draggedNodeId === actionNode.id,
-        onEdit: () => {
-          setSelectedActionNode(actionNode.id);
-          setShowActionEditor(true);
+    // Build set of action IDs that have incoming connections (from buttons)
+    const connectedActionIds = new Set<string>();
+    project.menus.forEach(menu => {
+      menu.buttons.forEach(button => {
+        if (button.targetActionId) {
+          connectedActionIds.add(button.targetActionId);
+        }
+      });
+    });
+    // Also check action outcomes pointing to other actions
+    project.actionNodes.forEach(actionNode => {
+      if (actionNode.outcomes) {
+        actionNode.outcomes.forEach(outcome => {
+          if (outcome.targetId && project.actionNodes.some(an => an.id === outcome.targetId)) {
+            connectedActionIds.add(outcome.targetId);
+          }
+        });
+      }
+    });
+
+    return project.actionNodes.map((actionNode) => {
+      // An action is orphan if nothing points to it
+      const isOrphan = !connectedActionIds.has(actionNode.id);
+
+      return {
+        id: actionNode.id,
+        type: 'actionNode',
+        position: actionNode.position,
+        zIndex: draggedNodeId === actionNode.id ? 1000 : (zIndexOrderRef.current.get(actionNode.id) || 1),
+        data: {
+          actionNode,
+          isSelected: actionNode.id === selectedActionNodeId,
+          isDragging: draggedNodeId === actionNode.id,
+          isOrphan,
+          onEdit: () => {
+            setSelectedActionNode(actionNode.id);
+            setShowActionEditor(true);
+          },
+          onDelete: () => {
+            const actionInfo = ACTION_CATEGORIES.basic.actions.includes(actionNode.type as any)
+              ? 'Базовое действие'
+              : actionNode.type;
+            setActionNodeToDelete({ id: actionNode.id, name: actionInfo });
+          },
+          onDuplicate: () => {
+            duplicateActionNode(actionNode.id);
+          },
         },
-        onDelete: () => {
-          const actionInfo = ACTION_CATEGORIES.basic.actions.includes(actionNode.type as any)
-            ? 'Базовое действие'
-            : actionNode.type;
-          setActionNodeToDelete({ id: actionNode.id, name: actionInfo });
-        },
-        onDuplicate: () => {
-          duplicateActionNode(actionNode.id);
-        },
-      },
-    }));
-  }, [project?.actionNodes, selectedActionNodeId, setSelectedActionNode, duplicateActionNode, draggedNodeId]);
+      };
+    });
+  }, [project?.actionNodes, project?.menus, selectedActionNodeId, setSelectedActionNode, duplicateActionNode, draggedNodeId]);
 
   const nodes = useMemo(() => [...menuNodes, ...actionNodes], [menuNodes, actionNodes]);
 

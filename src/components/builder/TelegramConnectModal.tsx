@@ -13,7 +13,7 @@ interface TelegramConnectModalProps {
 
 type Step = 'token' | 'connecting' | 'success' | 'error';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://ghjyaaddstjoqcnljzeb.supabase.co';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const getWebhookUrl = (projectId: string) => 
   `${SUPABASE_URL}/functions/v1/telegram-webhook/${projectId}`;

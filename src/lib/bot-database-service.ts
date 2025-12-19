@@ -78,16 +78,22 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
     // Save action nodes
     const actionNodes = project.actionNodes || [];
     for (const actionNode of actionNodes) {
-      const { error: actionError } = await supabase.from('bot_action_nodes').insert({
+      // Include outcomes in config for storage
+      const configWithOutcomes = {
+        ...actionNode.config || {},
+        _outcomes: actionNode.outcomes || [],
+      };
+      
+      const { error: actionError } = await supabase.from('bot_action_nodes').insert([{
         id: actionNode.id,
         project_id: project.id,
         action_type: actionNode.type,
-        config: actionNode.config || {},
+        config: configWithOutcomes as any,
         position_x: actionNode.position?.x || 0,
         position_y: actionNode.position?.y || 0,
         next_node_id: actionNode.nextNodeId || null,
         next_node_type: actionNode.nextNodeType || null,
-      });
+      }]);
 
       if (actionError) {
         console.error('Error saving action node:', actionError);
@@ -182,14 +188,21 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
     });
 
     // Build action nodes
-    const actionNodes: BotActionNode[] = (actionNodesData || []).map(an => ({
-      id: an.id,
-      type: an.action_type as any,
-      config: (an.config as Record<string, any>) || {},
-      position: { x: an.position_x || 0, y: an.position_y || 0 },
-      nextNodeId: an.next_node_id || undefined,
-      nextNodeType: an.next_node_type as 'menu' | 'action' | undefined,
-    }));
+    const actionNodes: BotActionNode[] = (actionNodesData || []).map(an => {
+      const config = (an.config as Record<string, any>) || {};
+      const outcomes = config._outcomes || [];
+      const { _outcomes, ...cleanConfig } = config;
+      
+      return {
+        id: an.id,
+        type: an.action_type as any,
+        config: cleanConfig,
+        position: { x: an.position_x || 0, y: an.position_y || 0 },
+        nextNodeId: an.next_node_id || undefined,
+        nextNodeType: an.next_node_type as 'menu' | 'action' | undefined,
+        outcomes: outcomes.length > 0 ? outcomes : undefined,
+      };
+    });
 
     const globalSettings = projectData.global_settings as any || {};
 

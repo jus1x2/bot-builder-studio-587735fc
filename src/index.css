@@ -349,28 +349,44 @@ html, body {
 .react-flow__edge-path {
   @apply !stroke-primary/40;
   stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
   @apply !stroke-primary;
 }
 
-/* Cuttable edge hover effect */
+/* Cuttable edge hover effect - smooth and elegant */
 .react-flow__edge-interaction {
   cursor: pointer;
-  transition: stroke 0.3s ease, opacity 0.3s ease;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .react-flow__edge-interaction:hover {
-  stroke: hsl(var(--destructive) / 0.2) !important;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke: hsl(var(--destructive) / 0.15) !important;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: hsl(var(--destructive)) !important;
-  filter: drop-shadow(0 0 6px hsl(var(--destructive) / 0.4));
-  transition: stroke 0.3s ease, filter 0.3s ease;
+  stroke: hsl(var(--destructive) / 0.8) !important;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 8px hsl(var(--destructive) / 0.3));
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Selection box / lasso styling */
+.react-flow__selection {
+  background: hsl(var(--primary) / 0.08) !important;
+  border: 2px solid hsl(var(--primary) / 0.5) !important;
+  border-radius: 12px !important;
+}
+
+.react-flow__nodesselection-rect {
+  background: hsl(var(--primary) / 0.05) !important;
+  border: 2px solid hsl(var(--primary) / 0.4) !important;
+  border-radius: 12px !important;
 }
 
 .react-flow__controls {

@@ -8,6 +8,7 @@ export interface ActionNodeData extends Record<string, unknown> {
   actionNode: BotActionNode;
   isSelected: boolean;
   isDragging?: boolean;
+  isOrphan?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -21,7 +22,7 @@ interface ActionNodeProps {
 }
 
 function ActionNodeComponent({ data, selected }: ActionNodeProps) {
-  const { actionNode, isDragging, onEdit, onDelete, onDuplicate } = data;
+  const { actionNode, isDragging, isOrphan, onEdit, onDelete, onDuplicate } = data;
   const isSelected = selected || data.isSelected;
 
   const actionInfo = ACTION_INFO[actionNode.type];
@@ -475,12 +476,14 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
         opacity: 1,
         boxShadow: isDragging 
           ? '0 20px 40px -10px rgba(0,0,0,0.3), 0 0 0 2px hsl(var(--primary))' 
-          : undefined
+          : isOrphan
+            ? '0 0 20px 4px rgba(251, 146, 60, 0.5), 0 0 40px 8px rgba(251, 146, 60, 0.25)'
+            : undefined
       }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
       className={`action-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-colors ${colorClasses} ${
         isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
-      } ${isDragging ? 'cursor-grabbing' : ''}`}
+      } ${isDragging ? 'cursor-grabbing' : ''} ${isOrphan ? 'border-orange-400' : ''}`}
       style={{ 
         minWidth: hasCustomPreview || isMultiOutput ? 200 : 180, 
         maxWidth: hasCustomPreview || isMultiOutput ? 240 : 220,

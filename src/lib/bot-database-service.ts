@@ -48,8 +48,8 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
         message_text: menu.messageText || '',
         description: menu.description || null,
         parent_id: menu.parentId || null,
-        position_x: menu.position?.x || 0,
-        position_y: menu.position?.y || 0,
+        position_x: Math.round(menu.position?.x || 0),
+        position_y: Math.round(menu.position?.y || 0),
         menu_order: menu.order || 0,
         keyword_triggers: menu.keywordTriggers || [],
         settings: menu.settings || {},
@@ -58,7 +58,8 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
 
       if (menuError) {
         console.error('Error saving menu:', menuError);
-        continue;
+        // If menu save fails, we need to abort the entire save to avoid data loss
+        throw new Error(`Failed to save menu ${menu.id}: ${menuError.message}`);
       }
 
       // Save buttons for this menu
@@ -95,14 +96,15 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
         project_id: project.id,
         action_type: actionNode.type,
         config: configWithOutcomes as any,
-        position_x: actionNode.position?.x || 0,
-        position_y: actionNode.position?.y || 0,
+        position_x: Math.round(actionNode.position?.x || 0),
+        position_y: Math.round(actionNode.position?.y || 0),
         next_node_id: actionNode.nextNodeId || null,
         next_node_type: actionNode.nextNodeType || null,
       }]);
 
       if (actionError) {
         console.error('Error saving action node:', actionError);
+        throw new Error(`Failed to save action node ${actionNode.id}: ${actionError.message}`);
       }
     }
 

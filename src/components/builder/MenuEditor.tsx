@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Trash2, ChevronRight, Zap, Settings, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Link2, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, ChevronRight, Zap, Settings, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Link2, AlertCircle, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { BotMenu, BotButton, ACTION_INFO, BotAction, MAX_BUTTONS_PER_ROW } from '@/types/bot';
 import { useProjectStore } from '@/stores/projectStore';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ActionConfigurator } from './ActionConfigurator';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MenuEditorProps {
   menu: BotMenu;
@@ -17,9 +18,55 @@ interface MenuEditorProps {
 }
 
 export function MenuEditor({ menu, allMenus, onClose }: MenuEditorProps) {
-  const { updateMenu, addButton, updateButton, deleteButton, selectedButtonId, setSelectedButton, updateAction, deleteAction, moveButton, compactButtonRows, justMovedButtonId } = useProjectStore();
+  const { updateMenu, addButton, updateButton, deleteButton, selectedButtonId, setSelectedButton, updateAction, deleteAction, moveButton, compactButtonRows, justMovedButtonId, getCurrentProject } = useProjectStore();
+  const currentProject = getCurrentProject();
   const [activeTab, setActiveTab] = useState<'menu' | 'buttons'>('menu');
   const [editingAction, setEditingAction] = useState<{ buttonId: string; action: BotAction } | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadMedia = async (file: File) => {
+    if (!currentProject?.id) return;
+    
+    setUploadingMedia(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentProject.id}/${menu.id}-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+      
+      updateMenu(menu.id, { mediaUrl: publicUrl });
+      toast.success('Медиа загружено');
+    } catch (err) {
+      console.error('Error uploading media:', err);
+      toast.error('Ошибка загрузки');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('Файл слишком большой (макс. 10 МБ)');
+        return;
+      }
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        toast.error('Можно загружать только изображения или видео');
+        return;
+      }
+      uploadMedia(file);
+    }
+  };
 
   useEffect(() => {
     compactButtonRows(menu.id);
@@ -144,6 +191,84 @@ export function MenuEditor({ menu, allMenus, onClose }: MenuEditorProps) {
                   <p className="text-xs text-muted-foreground mt-2">
                     Поддерживается Markdown: *жирный*, _курсив_, `код`
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Медиа (фото/видео)
+                  </label>
+                  
+                  {menu.mediaUrl ? (
+                    <div className="relative mb-2">
+                      {menu.mediaUrl.includes('.mp4') || menu.mediaUrl.includes('.webm') ? (
+                        <video 
+                          src={menu.mediaUrl}
+                          className="w-full h-32 object-cover rounded-lg"
+                          controls
+                        />
+                      ) : (
+                        <img 
+                          src={menu.mediaUrl} 
+                          alt="" 
+                          className="w-full h-32 object-cover rounded-lg"
+                          onError={(e) => (e.target as HTMLImageElement).style.display = 'none'}
+                        />
+                      )}
+                      <button
+                        onClick={() => updateMenu(menu.id, { mediaUrl: undefined })}
+                        className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-lg hover:bg-black/70 transition-colors"
+                      >
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => mediaInputRef.current?.click()}
+                      className="w-full h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors mb-2"
+                    >
+                      {uploadingMedia ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      ) : (
+                        <>
+                          <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Нажмите для загрузки</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  
+                  <input
+                    ref={mediaInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    className="hidden"
+                    onChange={handleMediaChange}
+                  />
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => mediaInputRef.current?.click()}
+                      disabled={uploadingMedia}
+                    >
+                      {uploadingMedia ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-1" />
+                      )}
+                      Загрузить
+                    </Button>
+                  </div>
+                  
+                  <Input
+                    value={menu.mediaUrl || ''}
+                    onChange={(e) => updateMenu(menu.id, { mediaUrl: e.target.value })}
+                    placeholder="Или вставьте URL"
+                    className="mt-2 text-xs"
+                  />
                 </div>
 
                 <div>

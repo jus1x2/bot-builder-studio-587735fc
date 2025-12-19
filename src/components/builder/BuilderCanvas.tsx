@@ -292,21 +292,44 @@ export function BuilderCanvas() {
     if (!project) return [];
 
     const menuIdSet = new Set(project.menus.map((m) => m.id));
+    
+    // Calculate which menus are orphans (no incoming or outgoing connections)
+    const hasOutgoingConnection = new Set<string>();
+    const hasIncomingConnection = new Set<string>();
+    
+    project.menus.forEach(menu => {
+      menu.buttons.forEach(button => {
+        if (button.targetMenuId && menuIdSet.has(button.targetMenuId)) {
+          hasOutgoingConnection.add(menu.id);
+          hasIncomingConnection.add(button.targetMenuId);
+        }
+        if (button.targetActionId) {
+          hasOutgoingConnection.add(menu.id);
+        }
+      });
+    });
 
     return project.menus.map((menu, index) => {
       const connectedButtonIds = menu.buttons
         .filter((b) => (b.targetMenuId && menuIdSet.has(b.targetMenuId)) || b.targetActionId)
         .map((b) => b.id);
+      
+      // A menu is orphan if it's not root and has no connections at all
+      const isOrphan = menu.id !== project.rootMenuId && 
+        !hasOutgoingConnection.has(menu.id) && 
+        !hasIncomingConnection.has(menu.id);
 
       return {
         id: menu.id,
         type: 'menuNode',
         position: menu.position || { x: index * 300, y: index * 100 },
-        zIndex: draggedNodeId === menu.id ? 1000 : (lastInteractedNodeId === menu.id ? 500 : 1),
+        zIndex: draggedNodeId === menu.id ? 1000 : (lastInteractedNodeId === menu.id ? 100 : 1),
         data: {
           menu,
           isSelected: menu.id === currentMenuId,
           isRoot: menu.id === project.rootMenuId,
+          isOrphan,
+          isDragging: draggedNodeId === menu.id,
           connectedButtonIds,
           justMovedButtonId,
           onEdit: () => {
@@ -336,10 +359,11 @@ export function BuilderCanvas() {
       id: actionNode.id,
       type: 'actionNode',
       position: actionNode.position,
-      zIndex: draggedNodeId === actionNode.id ? 1000 : (lastInteractedNodeId === actionNode.id ? 500 : 1),
+      zIndex: draggedNodeId === actionNode.id ? 1000 : (lastInteractedNodeId === actionNode.id ? 100 : 1),
       data: {
         actionNode,
         isSelected: actionNode.id === selectedActionNodeId,
+        isDragging: draggedNodeId === actionNode.id,
         onEdit: () => {
           setSelectedActionNode(actionNode.id);
           setShowActionEditor(true);

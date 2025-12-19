@@ -335,48 +335,114 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
       case 'if_else':
         return (
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Поле для проверки
-              </label>
-              <Input
-                value={actionNode.config.field || ''}
-                onChange={(e) => updateConfig('field', e.target.value)}
-                placeholder="user.age"
-                className="telegram-input"
-              />
+            <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/30">
+              <p className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-1">
+                Условное ветвление
+              </p>
+              <p className="text-xs text-purple-600 dark:text-purple-400">
+                Проверяет условие и направляет по одному из двух путей
+              </p>
             </div>
+
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
-                Оператор
+                Тип проверки
               </label>
               <Select
-                value={actionNode.config.operator || 'equals'}
-                onValueChange={(value) => updateConfig('operator', value)}
+                value={actionNode.config.checkType || 'field'}
+                onValueChange={(value) => updateConfig('checkType', value)}
               >
                 <SelectTrigger className="telegram-input">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="equals">Равно</SelectItem>
-                  <SelectItem value="not_equals">Не равно</SelectItem>
-                  <SelectItem value="greater">Больше</SelectItem>
-                  <SelectItem value="less">Меньше</SelectItem>
-                  <SelectItem value="contains">Содержит</SelectItem>
-                  <SelectItem value="exists">Существует</SelectItem>
+                  <SelectItem value="field">Значение поля</SelectItem>
+                  <SelectItem value="tag">Наличие тега</SelectItem>
+                  <SelectItem value="points">Количество баллов</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Значение
-              </label>
-              <Input
-                value={actionNode.config.value || ''}
-                onChange={(e) => updateConfig('value', e.target.value)}
-                placeholder="18"
-                className="telegram-input"
-              />
+
+            {actionNode.config.checkType === 'tag' ? (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Тег для проверки
+                </label>
+                <Input
+                  value={actionNode.config.tag || ''}
+                  onChange={(e) => updateConfig('tag', e.target.value)}
+                  placeholder="vip"
+                  className="telegram-input"
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    {actionNode.config.checkType === 'points' ? 'Сравнить баллы' : 'Поле для проверки'}
+                  </label>
+                  <Input
+                    value={actionNode.config.field || ''}
+                    onChange={(e) => updateConfig('field', e.target.value)}
+                    placeholder={actionNode.config.checkType === 'points' ? 'points' : 'user.age'}
+                    className="telegram-input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Оператор
+                  </label>
+                  <Select
+                    value={actionNode.config.operator || 'equals'}
+                    onValueChange={(value) => updateConfig('operator', value)}
+                  >
+                    <SelectTrigger className="telegram-input">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="equals">Равно</SelectItem>
+                      <SelectItem value="not_equals">Не равно</SelectItem>
+                      <SelectItem value="greater">Больше</SelectItem>
+                      <SelectItem value="greater_eq">Больше или равно</SelectItem>
+                      <SelectItem value="less">Меньше</SelectItem>
+                      <SelectItem value="less_eq">Меньше или равно</SelectItem>
+                      <SelectItem value="contains">Содержит</SelectItem>
+                      <SelectItem value="exists">Существует</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {actionNode.config.operator !== 'exists' && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Значение
+                    </label>
+                    <Input
+                      value={actionNode.config.value || ''}
+                      onChange={(e) => updateConfig('value', e.target.value)}
+                      placeholder="18"
+                      className="telegram-input"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-xs text-muted-foreground mb-2">
+                💡 На канвасе соедините выходы:
+              </p>
+              <div className="space-y-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="text-green-600 dark:text-green-400 font-medium">Да</span>
+                  <span className="text-muted-foreground">— условие выполнено</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="text-red-600 dark:text-red-400 font-medium">Нет</span>
+                  <span className="text-muted-foreground">— условие не выполнено</span>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -487,6 +553,16 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
               <p className="text-xs text-pink-500 dark:text-pink-400 mt-2">
                 💡 Соедините каждый выход с нужным меню на канвасе
               </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Показывать уведомление о результате
+              </label>
+              <Switch
+                checked={actionNode.config.showNotification !== false}
+                onCheckedChange={(checked) => updateConfig('showNotification', checked)}
+              />
             </div>
 
             <div>
@@ -640,9 +716,9 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
               {weightedOutcomes.map((outcome: any, index: number) => {
                 const colors = ['bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
                 return (
-                  <div key={outcome.id || index} className="p-2.5 rounded-lg bg-muted/30 border border-border">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${colors[index % colors.length]}`} />
+                  <div key={outcome.id || index} className="p-2 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors[index % colors.length]}`} />
                       <Input
                         value={outcome.label || ''}
                         onChange={(e) => {
@@ -651,7 +727,7 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
                           updateConfig('outcomes', updated);
                         }}
                         placeholder={`Исход ${index + 1}`}
-                        className="telegram-input flex-1 h-8 text-sm"
+                        className="telegram-input flex-1 h-7 text-sm px-2"
                       />
                       <Input
                         type="number"
@@ -659,19 +735,18 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
                         max={99}
                         value={outcome.weight || 50}
                         onChange={(e) => updateWeight(index, Number(e.target.value) || 1)}
-                        className="telegram-input w-14 h-8 text-sm text-center"
+                        className="telegram-input w-16 h-7 text-sm text-center px-1"
                       />
-                      <span className="text-xs text-muted-foreground w-4">%</span>
+                      <span className="text-xs text-muted-foreground">%</span>
                       <input
                         type="range"
                         min={1}
                         max={99}
                         value={outcome.weight || 50}
                         onChange={(e) => updateWeight(index, Number(e.target.value))}
-                        className="w-20 h-1 accent-orange-500 cursor-pointer"
+                        className="w-16 h-1.5 rounded-full appearance-none cursor-pointer"
                         style={{ 
-                          background: `linear-gradient(to right, hsl(var(--primary)) ${outcome.weight}%, hsl(var(--muted)) ${outcome.weight}%)`,
-                          borderRadius: '4px'
+                          background: `linear-gradient(to right, hsl(24 95% 53%) ${outcome.weight}%, hsl(var(--muted)) ${outcome.weight}%)`
                         }}
                       />
                     </div>
@@ -685,20 +760,30 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Распределение
               </label>
-              <div className="h-5 rounded-md overflow-hidden flex">
+              <div className="h-4 rounded-md overflow-hidden flex">
                 {weightedOutcomes.map((outcome: any, index: number) => {
                   const colors = ['bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
                   return (
                     <div
                       key={outcome.id || index}
-                      className={`${colors[index % colors.length]} flex items-center justify-center text-[10px] font-medium text-white transition-all`}
+                      className={`${colors[index % colors.length]} flex items-center justify-center text-[9px] font-medium text-white transition-all`}
                       style={{ width: `${outcome.weight}%` }}
                     >
-                      {outcome.weight >= 12 && `${outcome.weight}%`}
+                      {outcome.weight >= 15 && `${outcome.weight}%`}
                     </div>
                   );
                 })}
               </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Показывать уведомление о результате
+              </label>
+              <Switch
+                checked={actionNode.config.showNotification !== false}
+                onCheckedChange={(checked) => updateConfig('showNotification', checked)}
+              />
             </div>
 
             <div>
@@ -1337,6 +1422,302 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
                 onCheckedChange={(checked) => updateConfig('showNotification', checked)}
               />
             </div>
+          </div>
+        );
+
+      case 'request_input':
+        return (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30">
+              <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                Запрос данных
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                Запрашивает ввод от пользователя и сохраняет в переменную
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Текст запроса
+              </label>
+              <Textarea
+                value={actionNode.config.promptText || ''}
+                onChange={(e) => updateConfig('promptText', e.target.value)}
+                placeholder="Введите ваш email:"
+                rows={2}
+                className="telegram-input resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Тип ввода
+              </label>
+              <Select
+                value={actionNode.config.inputType || 'text'}
+                onValueChange={(value) => updateConfig('inputType', value)}
+              >
+                <SelectTrigger className="telegram-input">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Текст</SelectItem>
+                  <SelectItem value="number">Число</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="phone">Телефон</SelectItem>
+                  <SelectItem value="date">Дата</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сохранить в переменную
+              </label>
+              <Input
+                value={actionNode.config.variableName || ''}
+                onChange={(e) => updateConfig('variableName', e.target.value)}
+                placeholder="user_email"
+                className="telegram-input"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Валидация ввода
+              </label>
+              <Switch
+                checked={actionNode.config.validate || false}
+                onCheckedChange={(checked) => updateConfig('validate', checked)}
+              />
+            </div>
+
+            {actionNode.config.validate && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Сообщение об ошибке
+                </label>
+                <Input
+                  value={actionNode.config.errorMessage || ''}
+                  onChange={(e) => updateConfig('errorMessage', e.target.value)}
+                  placeholder="Пожалуйста, введите корректный email"
+                  className="telegram-input"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Таймаут ожидания (сек)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                max={3600}
+                value={actionNode.config.timeout || 60}
+                onChange={(e) => updateConfig('timeout', Number(e.target.value))}
+                className="telegram-input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">0 = без ограничения</p>
+            </div>
+          </div>
+        );
+
+      case 'quiz':
+        const quizQuestions = actionNode.config.questions || [
+          { id: 'q1', text: '', answers: [{ id: 'a1', text: '', correct: true }, { id: 'a2', text: '', correct: false }] }
+        ];
+
+        const addQuestion = () => {
+          const newQ = {
+            id: `q${Date.now()}`,
+            text: '',
+            answers: [
+              { id: `a${Date.now()}-1`, text: '', correct: true },
+              { id: `a${Date.now()}-2`, text: '', correct: false }
+            ]
+          };
+          updateConfig('questions', [...quizQuestions, newQ]);
+        };
+
+        const updateQuestion = (qIndex: number, field: string, value: any) => {
+          const updated = [...quizQuestions];
+          updated[qIndex] = { ...updated[qIndex], [field]: value };
+          updateConfig('questions', updated);
+        };
+
+        const addAnswer = (qIndex: number) => {
+          const updated = [...quizQuestions];
+          updated[qIndex].answers.push({ id: `a${Date.now()}`, text: '', correct: false });
+          updateConfig('questions', updated);
+        };
+
+        const updateAnswer = (qIndex: number, aIndex: number, field: string, value: any) => {
+          const updated = [...quizQuestions];
+          if (field === 'correct' && value === true) {
+            // Only one correct answer per question
+            updated[qIndex].answers = updated[qIndex].answers.map((a: any, i: number) => ({
+              ...a,
+              correct: i === aIndex
+            }));
+          } else {
+            updated[qIndex].answers[aIndex] = { ...updated[qIndex].answers[aIndex], [field]: value };
+          }
+          updateConfig('questions', updated);
+        };
+
+        const removeQuestion = (qIndex: number) => {
+          if (quizQuestions.length <= 1) return;
+          const updated = quizQuestions.filter((_: any, i: number) => i !== qIndex);
+          updateConfig('questions', updated);
+        };
+
+        const removeAnswer = (qIndex: number, aIndex: number) => {
+          const updated = [...quizQuestions];
+          if (updated[qIndex].answers.length <= 2) return;
+          updated[qIndex].answers = updated[qIndex].answers.filter((_: any, i: number) => i !== aIndex);
+          updateConfig('questions', updated);
+        };
+
+        return (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/30">
+              <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
+                Квиз с вопросами
+              </p>
+              <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                Создайте викторину с подсчётом баллов
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Баллов за правильный ответ
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={actionNode.config.pointsPerCorrect || 1}
+                onChange={(e) => updateConfig('pointsPerCorrect', Number(e.target.value))}
+                className="telegram-input"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">
+                  Вопросы ({quizQuestions.length})
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addQuestion}
+                >
+                  + Вопрос
+                </Button>
+              </div>
+
+              {quizQuestions.map((question: any, qIndex: number) => (
+                <div key={question.id} className="p-3 rounded-lg bg-muted/30 border border-border space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground w-5">{qIndex + 1}.</span>
+                    <Input
+                      value={question.text || ''}
+                      onChange={(e) => updateQuestion(qIndex, 'text', e.target.value)}
+                      placeholder="Текст вопроса"
+                      className="telegram-input flex-1 h-8 text-sm"
+                    />
+                    {quizQuestions.length > 1 && (
+                      <button
+                        onClick={() => removeQuestion(qIndex)}
+                        className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="pl-5 space-y-1.5">
+                    {question.answers.map((answer: any, aIndex: number) => (
+                      <div key={answer.id} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateAnswer(qIndex, aIndex, 'correct', true)}
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            answer.correct 
+                              ? 'border-green-500 bg-green-500' 
+                              : 'border-muted-foreground/40 hover:border-green-400'
+                          }`}
+                        >
+                          {answer.correct && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </button>
+                        <Input
+                          value={answer.text || ''}
+                          onChange={(e) => updateAnswer(qIndex, aIndex, 'text', e.target.value)}
+                          placeholder={`Ответ ${aIndex + 1}`}
+                          className="telegram-input flex-1 h-7 text-sm"
+                        />
+                        {question.answers.length > 2 && (
+                          <button
+                            onClick={() => removeAnswer(qIndex, aIndex)}
+                            className="p-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => addAnswer(qIndex)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      + Добавить ответ
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сохранить результат в
+              </label>
+              <Input
+                value={actionNode.config.saveToField || 'quiz_score'}
+                onChange={(e) => updateConfig('saveToField', e.target.value)}
+                className="telegram-input"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Показать результат после квиза
+              </label>
+              <Switch
+                checked={actionNode.config.showResult !== false}
+                onCheckedChange={(checked) => updateConfig('showResult', checked)}
+              />
+            </div>
+
+            {actionNode.config.showResult !== false && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Текст результата
+                </label>
+                <Textarea
+                  value={actionNode.config.resultText || 'Вы набрали {score} из {total} баллов!'}
+                  onChange={(e) => updateConfig('resultText', e.target.value)}
+                  placeholder="Вы набрали {score} из {total} баллов!"
+                  rows={2}
+                  className="telegram-input resize-none"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Переменные: <code className="bg-muted px-1 rounded">{'{score}'}</code>, <code className="bg-muted px-1 rounded">{'{total}'}</code>, <code className="bg-muted px-1 rounded">{'{percent}'}</code>
+                </p>
+              </div>
+            )}
           </div>
         );
 

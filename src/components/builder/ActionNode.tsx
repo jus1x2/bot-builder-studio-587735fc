@@ -29,6 +29,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
   // Check if this is a multi-output action
   const isMultiOutput = actionNode.type === 'random_result' || actionNode.type === 'weighted_random';
   const isWeighted = actionNode.type === 'weighted_random';
+  const isIfElse = actionNode.type === 'if_else';
   
   // For random_result use outcomeCount, for weighted_random use outcomes array
   const weightedOutcomes = actionNode.config?.outcomes || [];
@@ -391,8 +392,44 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
+  // If/else preview with two outputs
+  const renderIfElsePreview = () => {
+    if (!isIfElse) return null;
+    
+    const { checkType, field, tag, operator, value } = actionNode.config;
+    let conditionText = '';
+    
+    if (checkType === 'tag') {
+      conditionText = `Тег "${tag || '?'}"`;
+    } else if (checkType === 'points') {
+      const opSymbol = { equals: '=', not_equals: '≠', greater: '>', greater_eq: '≥', less: '<', less_eq: '≤' }[operator as string] || '=';
+      conditionText = `Баллы ${opSymbol} ${value || '?'}`;
+    } else {
+      const opSymbol = { equals: '=', not_equals: '≠', greater: '>', greater_eq: '≥', less: '<', less_eq: '≤', contains: '∋', exists: '∃' }[operator as string] || '=';
+      conditionText = operator === 'exists' ? `${field || '?'} существует` : `${field || '?'} ${opSymbol} ${value || '?'}`;
+    }
+    
+    return (
+      <div className="mt-2 p-2 rounded-lg border bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/30">
+        <div className="text-[10px] text-purple-700 dark:text-purple-300 font-medium mb-2 truncate">
+          {conditionText}
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-[9px] p-1 bg-white/50 dark:bg-black/20 rounded">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+            <span className="text-green-600 dark:text-green-400 font-medium">Да</span>
+          </div>
+          <div className="flex items-center gap-2 text-[9px] p-1 bg-white/50 dark:bg-black/20 rounded">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+            <span className="text-red-600 dark:text-red-400 font-medium">Нет</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Calculate dynamic height for multi-output nodes
-  const nodeMinHeight = isMultiOutput ? Math.max(120, outcomeCount * 35 + 80) : undefined;
+  const nodeMinHeight = isMultiOutput ? Math.max(120, outcomeCount * 35 + 80) : (isIfElse ? 140 : undefined);
 
   return (
     <motion.div
@@ -457,15 +494,36 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       {renderPaymentPreview()}
       {renderAddToCartPreview()}
       {renderRandomResultPreview()}
+      {renderIfElsePreview()}
 
       {/* Single output handle for non-multi-output nodes */}
-      {!isMultiOutput && (
+      {!isMultiOutput && !isIfElse && (
         <Handle
           type="source"
           position={Position.Right}
           className="!w-3 !h-3 !bg-current !border-2 !border-background !rounded-full"
           style={{ right: -6 }}
         />
+      )}
+
+      {/* If/else two output handles */}
+      {isIfElse && (
+        <>
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="yes"
+            className="!w-3 !h-3 !bg-green-500 !border-2 !border-background !rounded-full"
+            style={{ right: -6, top: '40%' }}
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="no"
+            className="!w-3 !h-3 !bg-red-500 !border-2 !border-background !rounded-full"
+            style={{ right: -6, top: '70%' }}
+          />
+        </>
       )}
 
       {/* Multiple output handles for random_result / weighted_random */}

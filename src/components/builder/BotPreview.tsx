@@ -195,11 +195,16 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         const randomIndex = Math.floor(Math.random() * outcomeCount);
         const outcomes = actionNode.outcomes || [];
         const selectedOutcome = outcomes[randomIndex];
-        setActionMessages(prev => [...prev, { 
-          id: crypto.randomUUID(), 
-          text: `🎲 Случайный результат: Исход ${randomIndex + 1} (${Math.round(100 / outcomeCount)}%)`, 
-          type: 'bot' 
-        }]);
+        
+        // Only show notification if enabled (default true)
+        if (actionNode.config.showNotification !== false) {
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: `🎲 Случайный результат: Исход ${randomIndex + 1} (${Math.round(100 / outcomeCount)}%)`, 
+            type: 'bot' 
+          }]);
+        }
+        
         if (selectedOutcome?.targetId && selectedOutcome.targetType === 'menu') {
           return { navigateMenuId: selectedOutcome.targetId };
         } else if (selectedOutcome?.targetId && selectedOutcome.targetType === 'action') {
@@ -218,11 +223,16 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
               const nodeOutcomes = actionNode.outcomes || [];
               const selectedOutcome = nodeOutcomes[i];
               const percent = Math.round((outcomes[i].weight / totalWeight) * 100);
-              setActionMessages(prev => [...prev, { 
-                id: crypto.randomUUID(), 
-                text: `🎯 Взвешенный результат: ${outcomes[i].label || `Исход ${i + 1}`} (${percent}%)`, 
-                type: 'bot' 
-              }]);
+              
+              // Only show notification if enabled (default true)
+              if (actionNode.config.showNotification !== false) {
+                setActionMessages(prev => [...prev, { 
+                  id: crypto.randomUUID(), 
+                  text: `🎯 Взвешенный результат: ${outcomes[i].label || `Исход ${i + 1}`} (${percent}%)`, 
+                  type: 'bot' 
+                }]);
+              }
+              
               if (selectedOutcome?.targetId && selectedOutcome.targetType === 'menu') {
                 return { navigateMenuId: selectedOutcome.targetId };
               } else if (selectedOutcome?.targetId && selectedOutcome.targetType === 'action') {
@@ -231,6 +241,105 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
               break;
             }
           }
+        }
+        break;
+      }
+      case 'if_else': {
+        // Simulate condition check
+        const { checkType, operator, value } = actionNode.config;
+        let conditionResult = false;
+        
+        // In preview, we just randomly pick yes/no or base on simple logic
+        if (checkType === 'tag') {
+          conditionResult = Math.random() > 0.5;
+        } else if (operator === 'exists') {
+          conditionResult = true;
+        } else {
+          conditionResult = Math.random() > 0.5;
+        }
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🔀 Условие: ${conditionResult ? '✅ Да' : '❌ Нет'}`, 
+          type: 'bot' 
+        }]);
+        
+        const outcomes = actionNode.outcomes || [];
+        const selectedOutcome = conditionResult 
+          ? outcomes.find((o: any) => o.id === 'yes')
+          : outcomes.find((o: any) => o.id === 'no');
+        
+        if (selectedOutcome?.targetId && selectedOutcome.targetType === 'menu') {
+          return { navigateMenuId: selectedOutcome.targetId };
+        } else if (selectedOutcome?.targetId && selectedOutcome.targetType === 'action') {
+          return { navigateMenuId: null, nextActionId: selectedOutcome.targetId };
+        }
+        break;
+      }
+      case 'request_input': {
+        const promptText = actionNode.config.promptText || 'Введите значение:';
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: interpolateVariables(promptText, userContext), 
+          type: 'bot' 
+        }]);
+        // Simulate user response
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: 'Пример ответа', 
+          type: 'user' 
+        }]);
+        break;
+      }
+      case 'quiz': {
+        const questions = actionNode.config.questions || [];
+        const pointsPerCorrect = actionNode.config.pointsPerCorrect || 1;
+        let score = 0;
+        
+        for (const question of questions) {
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: `❓ ${question.text || 'Вопрос'}`, 
+            type: 'bot' 
+          }]);
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Simulate user answering (randomly correct or not)
+          const isCorrect = Math.random() > 0.5;
+          const correctAnswer = question.answers?.find((a: any) => a.correct);
+          if (isCorrect && correctAnswer) {
+            score += pointsPerCorrect;
+            setActionMessages(prev => [...prev, { 
+              id: crypto.randomUUID(), 
+              text: correctAnswer.text || 'Ответ', 
+              type: 'user' 
+            }]);
+          } else {
+            const wrongAnswer = question.answers?.find((a: any) => !a.correct);
+            setActionMessages(prev => [...prev, { 
+              id: crypto.randomUUID(), 
+              text: wrongAnswer?.text || 'Неверный ответ', 
+              type: 'user' 
+            }]);
+          }
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        if (actionNode.config.showResult !== false) {
+          const total = questions.length * pointsPerCorrect;
+          const percent = Math.round((score / total) * 100);
+          let resultText = actionNode.config.resultText || 'Вы набрали {score} из {total} баллов!';
+          resultText = resultText
+            .replace('{score}', String(score))
+            .replace('{total}', String(total))
+            .replace('{percent}', `${percent}%`);
+          
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: `🏆 ${resultText}`, 
+            type: 'bot' 
+          }]);
         }
         break;
       }

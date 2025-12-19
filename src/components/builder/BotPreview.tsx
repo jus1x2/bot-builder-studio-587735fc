@@ -162,33 +162,44 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
   }, [menu, prevMenuId]);
 
   const executeActionNode = useCallback(async (actionNode: BotActionNode): Promise<{ navigateMenuId: string | null; nextActionId?: string }> => {
+    // Helper to get next node info
+    const getNextNode = () => {
+      if (actionNode.nextNodeType === 'menu' && actionNode.nextNodeId) {
+        return { navigateMenuId: actionNode.nextNodeId };
+      } else if (actionNode.nextNodeType === 'action' && actionNode.nextNodeId) {
+        return { navigateMenuId: null, nextActionId: actionNode.nextNodeId };
+      }
+      return { navigateMenuId: null };
+    };
+
     switch (actionNode.type) {
       case 'show_text': {
         const text = actionNode.config.text || '';
         const interpolated = interpolateVariables(text, userContext);
         setActionMessages(prev => [...prev, { id: crypto.randomUUID(), text: interpolated, type: 'bot' }]);
-        break;
+        // Return next node info to continue chain
+        return getNextNode();
       }
       case 'delay': {
         const delayMs = (actionNode.config.seconds || 1) * 1000;
         if (actionNode.config.showTyping) setIsTypingIndicator(true);
         await new Promise(resolve => setTimeout(resolve, delayMs));
         if (actionNode.config.showTyping) setIsTypingIndicator(false);
-        break;
+        return getNextNode();
       }
       case 'typing_indicator': {
         const duration = (actionNode.config.seconds || 2) * 1000;
         setIsTypingIndicator(true);
         await new Promise(resolve => setTimeout(resolve, duration));
         setIsTypingIndicator(false);
-        break;
+        return getNextNode();
       }
       case 'navigate_menu':
         return { navigateMenuId: actionNode.config.menuId || null };
       case 'open_url': {
         const url = actionNode.config.url;
         if (url) window.open(url, '_blank');
-        break;
+        return getNextNode();
       }
       case 'random_result': {
         const outcomeCount = actionNode.config.outcomeCount || 2;
@@ -385,20 +396,23 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
     while (currentNodeId) {
       const actionNode = actionNodes.find(an => an.id === currentNodeId);
       if (!actionNode) break;
+      
       const result = await executeActionNode(actionNode);
+      
+      // If we got a menu to navigate to, stop and return it
       if (result.navigateMenuId) {
         navigateToMenuId = result.navigateMenuId;
         break;
       }
+      
+      // If we got a next action, continue the chain
       if (result.nextActionId) {
         currentNodeId = result.nextActionId;
         continue;
       }
-      if (actionNode.nextNodeType === 'menu' && actionNode.nextNodeId) {
-        navigateToMenuId = actionNode.nextNodeId;
-        break;
-      }
-      currentNodeId = actionNode.nextNodeType === 'action' ? actionNode.nextNodeId || null : null;
+      
+      // No more nodes to process
+      currentNodeId = null;
     }
     return navigateToMenuId;
   }, [actionNodes, executeActionNode]);

@@ -1994,6 +1994,98 @@ export function ActionNodeEditor({ actionNode, menus, onClose, onDelete }: Actio
           </div>
         );
 
+      case 'spam_protection':
+        return (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
+              <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">
+                🛡️ Антиспам
+              </p>
+              <p className="text-xs text-red-600 dark:text-red-400">
+                Защита от слишком частых нажатий
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Минимальный интервал (секунды)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                max={3600}
+                value={actionNode.config.cooldownSeconds || 5}
+                onChange={(e) => updateConfig('cooldownSeconds', Number(e.target.value))}
+                className="telegram-input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Через сколько секунд можно повторить действие
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сообщение при блокировке
+              </label>
+              <Textarea
+                value={actionNode.config.blockedMessage || '⏳ Подождите {remaining} секунд перед следующим действием'}
+                onChange={(e) => updateConfig('blockedMessage', e.target.value)}
+                placeholder="⏳ Подождите {remaining} секунд"
+                rows={2}
+                className="telegram-input resize-none"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Переменная: <code className="bg-muted px-1 rounded">{'{remaining}'}</code> — оставшееся время
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-foreground">
+                Показывать уведомление при блокировке
+              </label>
+              <Switch
+                checked={actionNode.config.showBlockMessage !== false}
+                onCheckedChange={(checked) => updateConfig('showBlockMessage', checked)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Максимум действий за период
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={actionNode.config.maxActions || 10}
+                  onChange={(e) => updateConfig('maxActions', Number(e.target.value))}
+                  placeholder="Кол-во"
+                  className="telegram-input"
+                />
+                <Select
+                  value={actionNode.config.periodType || 'hour'}
+                  onValueChange={(value) => updateConfig('periodType', value)}
+                >
+                  <SelectTrigger className="telegram-input">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minute">в минуту</SelectItem>
+                    <SelectItem value="hour">в час</SelectItem>
+                    <SelectItem value="day">в день</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-xs text-muted-foreground">
+                ⚡ Если лимит превышен, пользователь не сможет выполнить действие до истечения периода
+              </p>
+            </div>
+          </div>
+        );
+
       default:
         return (
           <div className="text-center py-6 text-muted-foreground">

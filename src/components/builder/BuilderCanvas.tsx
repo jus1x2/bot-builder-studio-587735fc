@@ -416,11 +416,13 @@ export function BuilderCanvas() {
     });
 
     (project.actionNodes || []).forEach((actionNode) => {
-      // Check if this is a multi-output action (random_result or weighted_random)
+      // Check if this is a multi-output action (random_result, weighted_random, or lottery)
       const isMultiOutput = actionNode.type === 'random_result' || actionNode.type === 'weighted_random';
       const isWeighted = actionNode.type === 'weighted_random';
+      const isLottery = actionNode.type === 'lottery';
+      const isIfElse = actionNode.type === 'if_else';
       
-      if (isMultiOutput && actionNode.outcomes) {
+      if ((isMultiOutput || isLottery || isIfElse) && actionNode.outcomes) {
         // For weighted_random, get weights from config.outcomes
         const weightedOutcomes = actionNode.config?.outcomes || [];
         const totalWeight = isWeighted 
@@ -435,17 +437,25 @@ export function BuilderCanvas() {
             
             if (isMenuTarget || isActionTarget) {
               // Calculate percentage for label
-              let percent: number;
               let label: string;
+              let strokeColor: string;
               
               if (isWeighted) {
                 const weight = weightedOutcomes[index]?.weight || 1;
-                percent = Math.round((weight / totalWeight) * 100);
+                const percent = Math.round((weight / totalWeight) * 100);
                 const outcomeLabel = weightedOutcomes[index]?.label;
                 label = outcomeLabel ? `${outcomeLabel} (${percent}%)` : `${percent}%`;
+                strokeColor = 'hsl(30 90% 55%)'; // Orange
+              } else if (isLottery) {
+                label = index === 0 ? '🎉 Выигрыш' : '😔 Проигрыш';
+                strokeColor = index === 0 ? 'hsl(145 65% 45%)' : 'hsl(0 70% 50%)';
+              } else if (isIfElse) {
+                label = outcome.id === 'yes' ? '✓ Да' : '✗ Нет';
+                strokeColor = outcome.id === 'yes' ? 'hsl(145 65% 45%)' : 'hsl(0 70% 50%)';
               } else {
-                percent = Math.round(100 / (actionNode.config?.outcomeCount || 2));
+                const percent = Math.round(100 / (actionNode.config?.outcomeCount || 2));
                 label = `${percent}%`;
+                strokeColor = 'hsl(330 80% 60%)'; // Pink
               }
               
               edgeList.push({
@@ -457,7 +467,7 @@ export function BuilderCanvas() {
                 animated: true,
                 style: {
                   strokeWidth: 2,
-                  stroke: isWeighted ? 'hsl(30 90% 55%)' : 'hsl(330 80% 60%)', // Orange for weighted, Pink for random
+                  stroke: strokeColor,
                 },
                 label,
                 data: {
@@ -466,6 +476,8 @@ export function BuilderCanvas() {
                   isActionConnection: true,
                   isMultiOutput: true,
                   isWeighted,
+                  isLottery,
+                  isIfElse,
                 },
               });
             }

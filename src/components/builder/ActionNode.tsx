@@ -30,6 +30,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
   const isMultiOutput = actionNode.type === 'random_result' || actionNode.type === 'weighted_random';
   const isWeighted = actionNode.type === 'weighted_random';
   const isIfElse = actionNode.type === 'if_else';
+  const isLottery = actionNode.type === 'lottery';
   
   // For random_result use outcomeCount, for weighted_random use outcomes array
   const weightedOutcomes = actionNode.config?.outcomes || [];
@@ -428,8 +429,42 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
+  // Lottery preview with win/lose outputs
+  const renderLotteryPreview = () => {
+    if (!isLottery) return null;
+    
+    const winChance = actionNode.config.winChance || 10;
+    const prize = actionNode.config.prize;
+    
+    return (
+      <div className="mt-2 p-2 rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/30">
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-sm">🎰</span>
+          <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">
+            Шанс: {winChance}%
+          </span>
+        </div>
+        {prize && (
+          <p className="text-[9px] text-amber-600 dark:text-amber-400 mb-2 truncate">
+            Приз: {prize}
+          </p>
+        )}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-[9px] p-1 bg-white/50 dark:bg-black/20 rounded">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+            <span className="text-green-600 dark:text-green-400 font-medium">Выигрыш</span>
+          </div>
+          <div className="flex items-center gap-2 text-[9px] p-1 bg-white/50 dark:bg-black/20 rounded">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+            <span className="text-red-600 dark:text-red-400 font-medium">Проигрыш</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Calculate dynamic height for multi-output nodes
-  const nodeMinHeight = isMultiOutput ? Math.max(120, outcomeCount * 35 + 80) : (isIfElse ? 140 : undefined);
+  const nodeMinHeight = isMultiOutput ? Math.max(120, outcomeCount * 35 + 80) : (isIfElse || isLottery ? 140 : undefined);
 
   return (
     <motion.div
@@ -495,9 +530,10 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       {renderAddToCartPreview()}
       {renderRandomResultPreview()}
       {renderIfElsePreview()}
+      {renderLotteryPreview()}
 
       {/* Single output handle for non-multi-output nodes */}
-      {!isMultiOutput && !isIfElse && (
+      {!isMultiOutput && !isIfElse && !isLottery && (
         <Handle
           type="source"
           position={Position.Right}
@@ -520,6 +556,26 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
             type="source"
             position={Position.Right}
             id="no"
+            className="!w-3 !h-3 !bg-red-500 !border-2 !border-background !rounded-full"
+            style={{ right: -6, top: '70%' }}
+          />
+        </>
+      )}
+
+      {/* Lottery two output handles: win and lose */}
+      {isLottery && (
+        <>
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={actionNode.outcomes?.[0]?.id || 'win'}
+            className="!w-3 !h-3 !bg-green-500 !border-2 !border-background !rounded-full"
+            style={{ right: -6, top: '40%' }}
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={actionNode.outcomes?.[1]?.id || 'lose'}
             className="!w-3 !h-3 !bg-red-500 !border-2 !border-background !rounded-full"
             style={{ right: -6, top: '70%' }}
           />

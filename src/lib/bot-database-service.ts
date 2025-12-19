@@ -6,6 +6,12 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
   try {
     console.log('Saving project to database:', project.id, 'for profile:', profileId);
 
+    // Safety check: don't save if project has no menus (likely corrupted state)
+    if (!project.menus || project.menus.length === 0) {
+      console.warn('Refusing to save project with no menus - possible corrupted state');
+      return false;
+    }
+
     // Upsert project
     const { error: projectError } = await supabase
       .from('bot_projects')

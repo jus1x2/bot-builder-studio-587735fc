@@ -465,18 +465,9 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         break;
       }
       case 'spam_protection': {
-        const cooldown = actionNode.config.cooldownSeconds || 5;
-        const maxActions = actionNode.config.maxActions || 10;
-        const periodType = actionNode.config.periodType || 'hour';
-        const periodText = periodType === 'minute' ? 'мин' : periodType === 'hour' ? 'час' : 'день';
-        
-        // In preview, just show info about spam protection
-        setActionMessages(prev => [...prev, { 
-          id: crypto.randomUUID(), 
-          text: `🛡️ Антиспам активен\nИнтервал: ${cooldown} сек\nМакс: ${maxActions}/${periodText}`, 
-          type: 'bot' 
-        }]);
-        break;
+        // In preview, spam protection just passes through (simulates successful check)
+        // No message shown - action is a silent gate that allows continuation
+        return getNextNode();
       }
     }
     return { navigateMenuId: null };

@@ -260,6 +260,7 @@ export function BuilderCanvas() {
   const [showActionEditor, setShowActionEditor] = useState(false);
   const [currentViewport, setCurrentViewport] = useState({ x: 100, y: 100, zoom: 0.8 });
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
+  const [lastInteractedNodeId, setLastInteractedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (projectId) setCurrentProject(projectId);
@@ -301,7 +302,7 @@ export function BuilderCanvas() {
         id: menu.id,
         type: 'menuNode',
         position: menu.position || { x: index * 300, y: index * 100 },
-        zIndex: draggedNodeId === menu.id ? 1000 : 1,
+        zIndex: draggedNodeId === menu.id ? 1000 : (lastInteractedNodeId === menu.id ? 500 : 1),
         data: {
           menu,
           isSelected: menu.id === currentMenuId,
@@ -326,7 +327,7 @@ export function BuilderCanvas() {
         },
       };
     });
-  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast, draggedNodeId]);
+  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast, draggedNodeId, lastInteractedNodeId]);
 
   const actionNodes: Node<ActionNodeData>[] = useMemo(() => {
     if (!project?.actionNodes) return [];
@@ -335,7 +336,7 @@ export function BuilderCanvas() {
       id: actionNode.id,
       type: 'actionNode',
       position: actionNode.position,
-      zIndex: draggedNodeId === actionNode.id ? 1000 : 1,
+      zIndex: draggedNodeId === actionNode.id ? 1000 : (lastInteractedNodeId === actionNode.id ? 500 : 1),
       data: {
         actionNode,
         isSelected: actionNode.id === selectedActionNodeId,
@@ -354,7 +355,7 @@ export function BuilderCanvas() {
         },
       },
     }));
-  }, [project?.actionNodes, selectedActionNodeId, setSelectedActionNode, duplicateActionNode, draggedNodeId]);
+  }, [project?.actionNodes, selectedActionNodeId, setSelectedActionNode, duplicateActionNode, draggedNodeId, lastInteractedNodeId]);
 
   const nodes = useMemo(() => [...menuNodes, ...actionNodes], [menuNodes, actionNodes]);
 
@@ -649,6 +650,7 @@ export function BuilderCanvas() {
   const handleNodeDragStart = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setDraggedNodeId(node.id);
+      setLastInteractedNodeId(node.id);
     },
     []
   );
@@ -656,6 +658,7 @@ export function BuilderCanvas() {
   const handleNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setDraggedNodeId(null);
+      // Keep lastInteractedNodeId so the node stays on top
       if (node.type === 'actionNode') {
         updateActionNode(node.id, { position: node.position });
       } else {
@@ -716,17 +719,16 @@ export function BuilderCanvas() {
     if (!project || project.menus.length === 0) return;
 
     const NODE_WIDTH = 280;
-    const NODE_HEIGHT = 200;
-    const ACTION_NODE_WIDTH = 220;
-    const ACTION_NODE_HEIGHT = 100;
-    const HORIZONTAL_GAP = 150;
-    const VERTICAL_GAP = 80;
+    const NODE_HEIGHT = 180;
+    const ACTION_NODE_WIDTH = 200;
+    const ACTION_NODE_HEIGHT = 90;
+    const HORIZONTAL_GAP = 100;
+    const VERTICAL_GAP = 50;
 
     // Build parent-child relationships
     const children = new Map<string, Set<string>>();
     const parents = new Map<string, Set<string>>();
     const menuToActions = new Map<string, string[]>();
-    const actionToTarget = new Map<string, { targetId: string; targetType: 'menu' | 'action' }>();
 
     project.menus.forEach(menu => {
       children.set(menu.id, new Set());
@@ -749,22 +751,12 @@ export function BuilderCanvas() {
       });
     });
 
-    // Map action node targets
-    (project.actionNodes || []).forEach(actionNode => {
-      if (actionNode.nextNodeId && actionNode.nextNodeType) {
-        actionToTarget.set(actionNode.id, {
-          targetId: actionNode.nextNodeId,
-          targetType: actionNode.nextNodeType
-        });
-      }
-    });
-
     // Find root menu (no parents or explicitly set as root)
     const rootId = project.rootMenuId ||
       project.menus.find(m => parents.get(m.id)!.size === 0)?.id ||
       project.menus[0].id;
 
-    // BFS to assign levels
+    // BFS to assign levels for connected menus
     const levels = new Map<string, number>();
     const visited = new Set<string>();
     const queue: { id: string; level: number }[] = [{ id: rootId, level: 0 }];
@@ -784,12 +776,13 @@ export function BuilderCanvas() {
       });
     }
 
-    // Handle unvisited menus (orphans) - place them at the end
-    let maxLevel = Math.max(...Array.from(levels.values()), 0);
-    project.menus.forEach((menu, idx) => {
-      if (!levels.has(menu.id)) {
-        levels.set(menu.id, maxLevel + 1 + Math.floor(idx / 3));
-      }
+    // Handle unvisited menus (orphans) - place them in a separate column after all connected menus
+    const connectedMaxLevel = levels.size > 0 ? Math.max(...Array.from(levels.values())) : -1;
+    const orphanMenus = project.menus.filter(menu => !levels.has(menu.id));
+    
+    // Place orphans in their own level(s), grouped vertically
+    orphanMenus.forEach((menu, idx) => {
+      levels.set(menu.id, connectedMaxLevel + 1 + Math.floor(idx / 4));
     });
 
     // Group menus by level
@@ -809,37 +802,22 @@ export function BuilderCanvas() {
         const parentsA = Array.from(parents.get(a) || []);
         const parentsB = Array.from(parents.get(b) || []);
         
-        const parentPosA = parentsA.length > 0 ? 
-          (levelGroups.get(level - 1)?.indexOf(parentsA[0]) ?? 0) : 0;
-        const parentPosB = parentsB.length > 0 ? 
-          (levelGroups.get(level - 1)?.indexOf(parentsB[0]) ?? 0) : 0;
+        const prevLevel = levelGroups.get(level - 1) || [];
+        const parentPosA = parentsA.length > 0 ? prevLevel.indexOf(parentsA[0]) : 999;
+        const parentPosB = parentsB.length > 0 ? prevLevel.indexOf(parentsB[0]) : 999;
         
         return parentPosA - parentPosB;
       });
     });
 
-    // Calculate positions - center each level vertically
+    // Calculate positions - more compact layout
     const positions = new Map<string, { x: number; y: number }>();
 
-    // Find max height needed
-    let maxNodesInLevel = 0;
-    levelGroups.forEach(nodeIds => {
-      if (nodeIds.length > maxNodesInLevel) {
-        maxNodesInLevel = nodeIds.length;
-      }
-    });
-    
-    const totalHeight = maxNodesInLevel * (NODE_HEIGHT + VERTICAL_GAP);
-    const centerY = totalHeight / 2;
-
     levelGroups.forEach((nodeIds, level) => {
-      const levelHeight = nodeIds.length * NODE_HEIGHT + (nodeIds.length - 1) * VERTICAL_GAP;
-      const startY = centerY - levelHeight / 2;
-
       nodeIds.forEach((id, index) => {
         positions.set(id, {
-          x: 100 + level * (NODE_WIDTH + HORIZONTAL_GAP),
-          y: startY + index * (NODE_HEIGHT + VERTICAL_GAP),
+          x: 50 + level * (NODE_WIDTH + HORIZONTAL_GAP),
+          y: 50 + index * (NODE_HEIGHT + VERTICAL_GAP),
         });
       });
     });
@@ -856,7 +834,7 @@ export function BuilderCanvas() {
     const actionNodes = project.actionNodes || [];
     if (actionNodes.length > 0) {
       const maxMenuLevel = Math.max(...Array.from(levelGroups.keys()));
-      const actionStartX = (maxMenuLevel + 1) * (NODE_WIDTH + HORIZONTAL_GAP) + 100;
+      const actionStartX = (maxMenuLevel + 1) * (NODE_WIDTH + HORIZONTAL_GAP) + 50;
       
       // Group actions by their source menu
       const actionsBySourceMenu = new Map<string, string[]>();
@@ -877,7 +855,7 @@ export function BuilderCanvas() {
       });
 
       // Position actions near their source menus
-      let globalActionY = 100;
+      let globalActionY = 50;
       
       actionsBySourceMenu.forEach((actionIds, menuId) => {
         const menuPos = positions.get(menuId);
@@ -889,23 +867,23 @@ export function BuilderCanvas() {
             updateActionNode(actionNode.id, {
               position: {
                 x: actionStartX,
-                y: baseY + idx * (ACTION_NODE_HEIGHT + 30),
+                y: baseY + idx * (ACTION_NODE_HEIGHT + 20),
               }
             });
           }
         });
         
-        globalActionY = Math.max(globalActionY, baseY + actionIds.length * (ACTION_NODE_HEIGHT + 30));
+        globalActionY = Math.max(globalActionY, baseY + actionIds.length * (ACTION_NODE_HEIGHT + 20));
       });
       
-      // Position orphan actions
+      // Position orphan actions below connected actions
       orphanActions.forEach((actionId, idx) => {
         const actionNode = actionNodes.find(a => a.id === actionId);
         if (actionNode) {
           updateActionNode(actionNode.id, {
             position: {
-              x: actionStartX + ACTION_NODE_WIDTH + 50,
-              y: 100 + idx * (ACTION_NODE_HEIGHT + 30),
+              x: actionStartX,
+              y: globalActionY + 30 + idx * (ACTION_NODE_HEIGHT + 20),
             }
           });
         }

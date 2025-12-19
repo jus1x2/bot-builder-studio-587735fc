@@ -1437,58 +1437,140 @@ export function ActionConfigurator({ action, menus, onChange, onClose, onSave }:
         );
 
       case 'weighted_random':
+        const weightedOutcomes = action.config.outcomes || [
+          { id: 'outcome-0', weight: 50, label: '' },
+          { id: 'outcome-1', weight: 50, label: '' },
+        ];
+        const totalWeight = weightedOutcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0);
+        
         return (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Укажите варианты и их веса (чем больше вес, тем выше шанс)
-            </p>
-            {(action.config.items || [{ text: '', weight: 1 }]).map((item: any, index: number) => (
-              <div key={index} className="flex gap-2">
-                <Input
-                  value={item.text || ''}
-                  onChange={(e) => {
-                    const items = [...(action.config.items || [{ text: '', weight: 1 }])];
-                    items[index] = { ...items[index], text: e.target.value };
-                    updateConfig('items', items);
-                  }}
-                  placeholder="Вариант"
-                  className="telegram-input flex-1"
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  value={item.weight || 1}
-                  onChange={(e) => {
-                    const items = [...(action.config.items || [{ text: '', weight: 1 }])];
-                    items[index] = { ...items[index], weight: Number(e.target.value) };
-                    updateConfig('items', items);
-                  }}
-                  className="telegram-input w-20"
-                  placeholder="Вес"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    const items = (action.config.items || []).filter((_: any, i: number) => i !== index);
-                    updateConfig('items', items.length ? items : [{ text: '', weight: 1 }]);
-                  }}
-                >
-                  <Trash className="w-4 h-4" />
-                </Button>
+            <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/30">
+              <p className="text-sm font-medium text-orange-700 dark:text-orange-300 mb-1">
+                Взвешенный случайный выбор
+              </p>
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                Укажите вес для каждого исхода. Чем больше вес, тем выше шанс.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {weightedOutcomes.map((outcome: any, index: number) => {
+                const percent = totalWeight > 0 ? Math.round((outcome.weight / totalWeight) * 100) : 0;
+                return (
+                  <div key={outcome.id || index} className="p-3 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-foreground">Исход {index + 1}</span>
+                      <span className="text-xs font-medium text-orange-600 dark:text-orange-400">
+                        {percent}%
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={outcome.label || ''}
+                        onChange={(e) => {
+                          const updated = weightedOutcomes.map((o: any, i: number) =>
+                            i === index ? { ...o, label: e.target.value } : o
+                          );
+                          updateConfig('outcomes', updated);
+                        }}
+                        placeholder={`Название исхода ${index + 1}`}
+                        className="telegram-input flex-1"
+                      />
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={outcome.weight || 1}
+                        onChange={(e) => {
+                          const updated = weightedOutcomes.map((o: any, i: number) =>
+                            i === index ? { ...o, weight: Math.max(1, Number(e.target.value)) } : o
+                          );
+                          updateConfig('outcomes', updated);
+                        }}
+                        className="telegram-input w-20"
+                        placeholder="Вес"
+                      />
+                      {weightedOutcomes.length > 2 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            const updated = weightedOutcomes.filter((_: any, i: number) => i !== index);
+                            updateConfig('outcomes', updated);
+                          }}
+                        >
+                          <Trash className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {weightedOutcomes.length < 10 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  const newOutcome = { 
+                    id: `outcome-${weightedOutcomes.length}`, 
+                    weight: 10, 
+                    label: '' 
+                  };
+                  updateConfig('outcomes', [...weightedOutcomes, newOutcome]);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Добавить исход
+              </Button>
+            )}
+
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-2">Распределение вероятностей:</p>
+              <div className="flex h-4 rounded-full overflow-hidden bg-muted">
+                {weightedOutcomes.map((outcome: any, index: number) => {
+                  const percent = totalWeight > 0 ? (outcome.weight / totalWeight) * 100 : 0;
+                  const colors = [
+                    'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 
+                    'bg-lime-500', 'bg-emerald-500', 'bg-cyan-500',
+                    'bg-blue-500', 'bg-violet-500', 'bg-pink-500', 'bg-rose-500'
+                  ];
+                  return (
+                    <div
+                      key={outcome.id || index}
+                      className={`${colors[index % colors.length]} flex items-center justify-center`}
+                      style={{ width: `${percent}%` }}
+                      title={`Исход ${index + 1}: ${Math.round(percent)}%`}
+                    >
+                      {percent > 10 && (
+                        <span className="text-[9px] font-bold text-white">{Math.round(percent)}%</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const items = [...(action.config.items || [{ text: '', weight: 1 }]), { text: '', weight: 1 }];
-                updateConfig('items', items);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Добавить вариант
-            </Button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Сохранить индекс результата в поле
+              </label>
+              <Input
+                value={action.config.saveToField || ''}
+                onChange={(e) => updateConfig('saveToField', e.target.value)}
+                placeholder="user.weighted_outcome"
+                className="telegram-input"
+              />
+            </div>
+
+            <div className="p-2 rounded bg-orange-100 dark:bg-orange-900/30">
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                💡 Соедините каждый выход с нужным меню на канвасе
+              </p>
+            </div>
           </div>
         );
 

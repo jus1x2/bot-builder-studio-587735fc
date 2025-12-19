@@ -672,13 +672,20 @@ export const useProjectStore = create<ProjectStore>()(
         }
 
         // Initialize outcomes for multi-output actions
-        const isMultiOutput = type === 'random_result';
+        const isMultiOutput = type === 'random_result' || type === 'weighted_random';
         const defaultOutcomeCount = 2;
 
         const actionNode: BotActionNode = {
           id: uuidv4(),
           type,
-          config: isMultiOutput ? { outcomeCount: defaultOutcomeCount } : {},
+          config: type === 'random_result' 
+            ? { outcomeCount: defaultOutcomeCount } 
+            : type === 'weighted_random'
+              ? { outcomes: [
+                  { id: uuidv4(), weight: 50, label: '' },
+                  { id: uuidv4(), weight: 50, label: '' },
+                ] }
+              : {},
           position,
           outcomes: isMultiOutput
             ? Array.from({ length: defaultOutcomeCount }, () => ({ id: uuidv4() }))
@@ -730,6 +737,21 @@ export const useProjectStore = create<ProjectStore>()(
                       } else if (newCount < currentOutcomes.length) {
                         // Remove excess outcomes
                         updatedNode.outcomes = currentOutcomes.slice(0, newCount);
+                      }
+                    }
+                    
+                    // Sync outcomes array when outcomes change for weighted_random
+                    if (updatedNode.type === 'weighted_random' && updates.config?.outcomes !== undefined) {
+                      const configOutcomes = updates.config.outcomes;
+                      const currentOutcomes = updatedNode.outcomes || [];
+                      
+                      if (configOutcomes.length !== currentOutcomes.length) {
+                        // Rebuild outcomes array to match config
+                        updatedNode.outcomes = configOutcomes.map((o: any, i: number) => ({
+                          id: o.id || currentOutcomes[i]?.id || uuidv4(),
+                          targetId: currentOutcomes[i]?.targetId,
+                          targetType: currentOutcomes[i]?.targetType,
+                        }));
                       }
                     }
                     

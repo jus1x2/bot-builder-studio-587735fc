@@ -1,5 +1,15 @@
 /// <reference types="vite/client" />
 
+interface TelegramThemeParams {
+  bg_color?: string;
+  text_color?: string;
+  hint_color?: string;
+  link_color?: string;
+  button_color?: string;
+  button_text_color?: string;
+  secondary_bg_color?: string;
+}
+
 interface TelegramWebApp {
   initData: string;
   initDataUnsafe: {
@@ -22,6 +32,8 @@ interface TelegramWebApp {
   disableClosingConfirmation: () => void;
   viewportHeight: number;
   viewportStableHeight: number;
+  themeParams: TelegramThemeParams;
+  colorScheme: 'light' | 'dark';
   MainButton: {
     text: string;
     color: string;
@@ -33,6 +45,11 @@ interface TelegramWebApp {
     offClick: (callback: () => void) => void;
     show: () => void;
     hide: () => void;
+  };
+  BackButton: {
+    show: () => void;
+    hide: () => void;
+    onClick: (callback: () => void) => void;
   };
   onEvent: (eventType: string, callback: () => void) => void;
   offEvent: (eventType: string, callback: () => void) => void;

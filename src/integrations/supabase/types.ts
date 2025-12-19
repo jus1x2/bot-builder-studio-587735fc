@@ -16,46 +16,42 @@ export type Database = {
     Tables: {
       bot_action_nodes: {
         Row: {
-          action_order: number | null
           action_type: string
           config: Json | null
           created_at: string
           id: string
-          next_action_id: string | null
+          next_node_id: string | null
+          next_node_type: string | null
           position_x: number | null
           position_y: number | null
           project_id: string
+          updated_at: string
         }
         Insert: {
-          action_order?: number | null
           action_type: string
           config?: Json | null
           created_at?: string
           id?: string
-          next_action_id?: string | null
+          next_node_id?: string | null
+          next_node_type?: string | null
           position_x?: number | null
           position_y?: number | null
           project_id: string
+          updated_at?: string
         }
         Update: {
-          action_order?: number | null
           action_type?: string
           config?: Json | null
           created_at?: string
           id?: string
-          next_action_id?: string | null
+          next_node_id?: string | null
+          next_node_type?: string | null
           position_x?: number | null
           position_y?: number | null
           project_id?: string
+          updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "bot_action_nodes_next_action_id_fkey"
-            columns: ["next_action_id"]
-            isOneToOne: false
-            referencedRelation: "bot_action_nodes"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "bot_action_nodes_project_id_fkey"
             columns: ["project_id"]
@@ -63,51 +59,47 @@ export type Database = {
             referencedRelation: "bot_projects"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "bot_action_nodes_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "bot_projects_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       bot_buttons: {
         Row: {
           actions: Json | null
-          button_order: number | null
+          button_order: number
           created_at: string
           id: string
-          label_position: Json | null
+          label_position: number | null
           menu_id: string
-          row_index: number | null
+          row_index: number
           target_action_id: string | null
           target_menu_id: string | null
           text: string
+          updated_at: string
         }
         Insert: {
           actions?: Json | null
-          button_order?: number | null
+          button_order?: number
           created_at?: string
           id?: string
-          label_position?: Json | null
+          label_position?: number | null
           menu_id: string
-          row_index?: number | null
-          target_action_id?: string | null
-          target_menu_id?: string | null
-          text: string
-        }
-        Update: {
-          actions?: Json | null
-          button_order?: number | null
-          created_at?: string
-          id?: string
-          label_position?: Json | null
-          menu_id?: string
-          row_index?: number | null
+          row_index?: number
           target_action_id?: string | null
           target_menu_id?: string | null
           text?: string
+          updated_at?: string
+        }
+        Update: {
+          actions?: Json | null
+          button_order?: number
+          created_at?: string
+          id?: string
+          label_position?: number | null
+          menu_id?: string
+          row_index?: number
+          target_action_id?: string | null
+          target_menu_id?: string | null
+          text?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -129,9 +121,13 @@ export type Database = {
       bot_menus: {
         Row: {
           created_at: string
+          description: string | null
           id: string
-          message_text: string | null
+          keyword_triggers: string[] | null
+          menu_order: number | null
+          message_text: string
           name: string
+          parent_id: string | null
           position_x: number | null
           position_y: number | null
           project_id: string
@@ -140,9 +136,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
-          message_text?: string | null
+          keyword_triggers?: string[] | null
+          menu_order?: number | null
+          message_text?: string
           name: string
+          parent_id?: string | null
           position_x?: number | null
           position_y?: number | null
           project_id: string
@@ -151,9 +151,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
-          message_text?: string | null
+          keyword_triggers?: string[] | null
+          menu_order?: number | null
+          message_text?: string
           name?: string
+          parent_id?: string | null
           position_x?: number | null
           position_y?: number | null
           project_id?: string
@@ -162,17 +166,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "bot_menus_project_id_fkey"
-            columns: ["project_id"]
+            foreignKeyName: "bot_menus_parent_id_fkey"
+            columns: ["parent_id"]
             isOneToOne: false
-            referencedRelation: "bot_projects"
+            referencedRelation: "bot_menus"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "bot_menus_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
-            referencedRelation: "bot_projects_safe"
+            referencedRelation: "bot_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -180,38 +184,50 @@ export type Database = {
       bot_projects: {
         Row: {
           created_at: string
+          description: string | null
+          global_settings: Json | null
           id: string
           name: string
-          settings: Json | null
+          profile_id: string
+          root_menu_id: string | null
+          status: string
           telegram_bot_token: string | null
           telegram_bot_username: string | null
+          template: string | null
           updated_at: string
-          user_id: string | null
         }
         Insert: {
           created_at?: string
+          description?: string | null
+          global_settings?: Json | null
           id?: string
           name: string
-          settings?: Json | null
+          profile_id: string
+          root_menu_id?: string | null
+          status?: string
           telegram_bot_token?: string | null
           telegram_bot_username?: string | null
+          template?: string | null
           updated_at?: string
-          user_id?: string | null
         }
         Update: {
           created_at?: string
+          description?: string | null
+          global_settings?: Json | null
           id?: string
           name?: string
-          settings?: Json | null
+          profile_id?: string
+          root_menu_id?: string | null
+          status?: string
           telegram_bot_token?: string | null
           telegram_bot_username?: string | null
+          template?: string | null
           updated_at?: string
-          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "bot_projects_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "bot_projects_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -220,34 +236,40 @@ export type Database = {
       }
       bot_user_sessions: {
         Row: {
+          cart_data: Json | null
+          created_at: string
           current_menu_id: string | null
-          first_visit_at: string
           id: string
-          last_activity_at: string
-          points: number | null
           project_id: string
+          session_data: Json | null
+          tags: string[] | null
           telegram_user_id: string
-          variables: Json | null
+          updated_at: string
+          user_fields: Json | null
         }
         Insert: {
+          cart_data?: Json | null
+          created_at?: string
           current_menu_id?: string | null
-          first_visit_at?: string
           id?: string
-          last_activity_at?: string
-          points?: number | null
           project_id: string
+          session_data?: Json | null
+          tags?: string[] | null
           telegram_user_id: string
-          variables?: Json | null
+          updated_at?: string
+          user_fields?: Json | null
         }
         Update: {
+          cart_data?: Json | null
+          created_at?: string
           current_menu_id?: string | null
-          first_visit_at?: string
           id?: string
-          last_activity_at?: string
-          points?: number | null
           project_id?: string
+          session_data?: Json | null
+          tags?: string[] | null
           telegram_user_id?: string
-          variables?: Json | null
+          updated_at?: string
+          user_fields?: Json | null
         }
         Relationships: [
           {
@@ -262,13 +284,6 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "bot_projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bot_user_sessions_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "bot_projects_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -314,47 +329,7 @@ export type Database = {
       }
     }
     Views: {
-      bot_projects_safe: {
-        Row: {
-          created_at: string | null
-          id: string | null
-          name: string | null
-          settings: Json | null
-          telegram_bot_token_masked: string | null
-          telegram_bot_username: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string | null
-          name?: string | null
-          settings?: Json | null
-          telegram_bot_token_masked?: never
-          telegram_bot_username?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string | null
-          name?: string | null
-          settings?: Json | null
-          telegram_bot_token_masked?: never
-          telegram_bot_username?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bot_projects_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never

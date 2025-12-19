@@ -33,15 +33,27 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
       return false;
     }
 
-    // Delete existing menus (buttons will cascade)
-    await supabase.from('bot_menus').delete().eq('project_id', project.id);
+    // Get existing menu IDs to detect which ones to delete
+    const { data: existingMenus } = await supabase
+      .from('bot_menus')
+      .select('id')
+      .eq('project_id', project.id);
+    
+    const existingMenuIds = new Set((existingMenus || []).map(m => m.id));
+    const currentMenuIds = new Set(project.menus.map(m => m.id));
+    
+    // Delete menus that no longer exist
+    const menusToDelete = [...existingMenuIds].filter(id => !currentMenuIds.has(id));
+    if (menusToDelete.length > 0) {
+      await supabase.from('bot_menus').delete().in('id', menusToDelete);
+    }
 
-    // Delete existing action nodes
+    // Delete existing action nodes and re-insert (action nodes are simpler)
     await supabase.from('bot_action_nodes').delete().eq('project_id', project.id);
 
-    // Save menus
+    // Upsert menus (insert or update)
     for (const menu of project.menus) {
-      const { error: menuError } = await supabase.from('bot_menus').insert({
+      const { error: menuError } = await supabase.from('bot_menus').upsert({
         id: menu.id,
         project_id: project.id,
         name: menu.name,
@@ -58,9 +70,11 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
 
       if (menuError) {
         console.error('Error saving menu:', menuError);
-        // If menu save fails, we need to abort the entire save to avoid data loss
         throw new Error(`Failed to save menu ${menu.id}: ${menuError.message}`);
       }
+
+      // Delete existing buttons for this menu and re-insert
+      await supabase.from('bot_buttons').delete().eq('menu_id', menu.id);
 
       // Save buttons for this menu
       for (const button of menu.buttons) {

@@ -202,6 +202,14 @@ export const useProjectStore = create<ProjectStore>()(
             p.id === projectId ? { ...p, ...updates, updatedAt: new Date() } : p
           ),
         }));
+
+        // Sync to cloud after update
+        const { profileId } = get();
+        if (profileId) {
+          setTimeout(() => {
+            get().syncProjectToCloud(projectId);
+          }, 100);
+        }
       },
 
       restoreProject: (project) => {

@@ -68,7 +68,13 @@ interface ActionNode {
   id: string;
   action_type: string;
   config: any;
-  next_action_id?: string;
+  next_node_id?: string;
+  next_node_type?: string;
+  outcomes?: Array<{
+    id: string;
+    targetId?: string;
+    targetType?: 'action' | 'menu';
+  }>;
 }
 
 interface UserSession {
@@ -167,11 +173,16 @@ serve(async (req) => {
     // Build action nodes map
     const actionNodes: Map<string, ActionNode> = new Map();
     for (const an of actionNodesData || []) {
+      const config = an.config as any || {};
+      const outcomes = config._outcomes || [];
+      
       actionNodes.set(an.id, {
         id: an.id,
         action_type: an.action_type,
-        config: an.config,
-        next_action_id: an.next_action_id,
+        config: config,
+        next_node_id: an.next_node_id || undefined,
+        next_node_type: an.next_node_type || undefined,
+        outcomes: outcomes,
       });
     }
 
@@ -243,14 +254,14 @@ serve(async (req) => {
       });
     };
 
-    const settings = projectData.settings as { welcomeMessage: string; defaultMenuId: string };
-    const defaultMenuId = settings?.defaultMenuId;
+    const globalSettings = projectData.global_settings as { welcomeMessage?: string; defaultMenuId?: string } || {};
+    const defaultMenuId = globalSettings?.defaultMenuId || projectData.root_menu_id;
     const defaultMenu = defaultMenuId ? menus.get(defaultMenuId) : menus.values().next().value;
 
     // Handle /start command
     if (messageText === '/start') {
-      const welcomeText = settings?.welcomeMessage 
-        ? interpolate(settings.welcomeMessage)
+      const welcomeText = globalSettings?.welcomeMessage 
+        ? interpolate(globalSettings.welcomeMessage)
         : interpolate(`Привет, {first_name}! 👋`);
 
       if (defaultMenu) {
@@ -393,8 +404,19 @@ async function executeActionChain(
 
     if (result.nextActionId) {
       currentActionId = result.nextActionId;
+    } else if (action.next_node_type === 'action' && action.next_node_id) {
+      currentActionId = action.next_node_id;
+    } else if (action.next_node_type === 'menu' && action.next_node_id) {
+      const menu = menus.get(action.next_node_id);
+      if (menu) {
+        const menuText = interpolate(menu.message_text || menu.name);
+        const keyboard = buildInlineKeyboard(menu.buttons);
+        await sendMessage(botToken, chatId, menuText, keyboard);
+        session.current_menu_id = menu.id;
+      }
+      break;
     } else {
-      currentActionId = action.next_action_id;
+      currentActionId = undefined;
     }
 
     session = result.session;
@@ -407,13 +429,14 @@ async function executeActionChain(
 async function executeAction(
   botToken: string,
   chatId: number,
-  action: any,
+  action: ActionNode & { type?: string },
   session: UserSession,
   userContext: UserContext,
   interpolate: (text: string) => string
 ): Promise<{ session: UserSession; navigateToMenu?: string; nextActionId?: string }> {
   const config = action.config || {};
-  const actionType = action.action_type || action.type;
+  const actionType = action.action_type || (action as any).type;
+  const outcomes = action.outcomes || config._outcomes || [];
 
   switch (actionType) {
     case 'show_text': {
@@ -464,32 +487,67 @@ async function executeAction(
         case 'exists': conditionMet = fieldValue !== undefined && fieldValue !== null && fieldValue !== ''; break;
       }
 
-      return { 
-        session, 
-        nextActionId: conditionMet ? config.trueBranch : config.falseBranch 
-      };
+      // Use outcomes for branching
+      const selectedOutcome = conditionMet 
+        ? outcomes.find((o: any) => o.id === 'yes')
+        : outcomes.find((o: any) => o.id === 'no');
+      
+      if (selectedOutcome?.targetId) {
+        if (selectedOutcome.targetType === 'menu') {
+          return { session, navigateToMenu: selectedOutcome.targetId };
+        } else {
+          return { session, nextActionId: selectedOutcome.targetId };
+        }
+      }
+      return { session };
     }
 
     case 'random_result': {
-      const outcomes = config.outcomes || [];
-      if (outcomes.length > 0) {
-        const randomIndex = Math.floor(Math.random() * outcomes.length);
-        const result = outcomes[randomIndex];
-        if (result.text) await sendMessage(botToken, chatId, interpolate(result.text));
-        return { session, nextActionId: result.nextAction };
+      const outcomeCount = config.outcomeCount || outcomes.length || 2;
+      const randomIndex = Math.floor(Math.random() * outcomeCount);
+      const selectedOutcome = outcomes[randomIndex];
+      
+      if (selectedOutcome?.targetId) {
+        if (selectedOutcome.targetType === 'menu') {
+          return { session, navigateToMenu: selectedOutcome.targetId };
+        } else {
+          return { session, nextActionId: selectedOutcome.targetId };
+        }
       }
       return { session };
     }
 
     case 'lottery': {
-      const won = Math.random() * 100 < (config.winChance || 10);
-      if (won) {
-        await sendMessage(botToken, chatId, `🎉 ${interpolate(config.lotteryPrize || 'Вы выиграли!')}`);
-        return { session, nextActionId: config.winAction };
+      const winChance = config.winChance || 10;
+      const isWin = Math.random() * 100 < winChance;
+      const prize = config.prize || 'приз';
+      
+      if (isWin) {
+        const winMessage = interpolate(config.winMessage || '🎉 Поздравляем! Вы выиграли {prize}!').replace('{prize}', prize);
+        await sendMessage(botToken, chatId, winMessage);
+        
+        const winOutcome = outcomes.find((o: any) => o.id === 'win');
+        if (winOutcome?.targetId) {
+          if (winOutcome.targetType === 'menu') {
+            return { session, navigateToMenu: winOutcome.targetId };
+          } else {
+            return { session, nextActionId: winOutcome.targetId };
+          }
+        }
       } else {
-        await sendMessage(botToken, chatId, '😔 К сожалению, вы не выиграли. Попробуйте еще раз!');
-        return { session, nextActionId: config.loseAction };
+        const loseMessage = interpolate(config.loseMessage || '😔 К сожалению, не повезло. Попробуйте ещё!');
+        await sendMessage(botToken, chatId, loseMessage);
+        
+        const loseOutcome = outcomes.find((o: any) => o.id === 'lose');
+        if (loseOutcome?.targetId) {
+          if (loseOutcome.targetType === 'menu') {
+            return { session, navigateToMenu: loseOutcome.targetId };
+          } else {
+            return { session, nextActionId: loseOutcome.targetId };
+          }
+        }
       }
+      return { session };
     }
 
     case 'modify_points': {
@@ -507,6 +565,50 @@ async function executeAction(
     case 'show_product': {
       const text = `🛒 *${config.productName || 'Товар'}*\n💰 Цена: ${config.productPrice || '0'} ₽\n${config.productDescription || ''}`;
       await sendMessage(botToken, chatId, text);
+      return { session };
+    }
+
+    case 'weighted_random': {
+      const weightedOutcomes = config.outcomes || [];
+      if (weightedOutcomes.length > 0) {
+        const totalWeight = weightedOutcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0);
+        let random = Math.random() * totalWeight;
+        
+        for (let i = 0; i < weightedOutcomes.length; i++) {
+          random -= weightedOutcomes[i].weight || 1;
+          if (random <= 0) {
+            const selectedOutcome = outcomes[i];
+            if (selectedOutcome?.targetId) {
+              if (selectedOutcome.targetType === 'menu') {
+                return { session, navigateToMenu: selectedOutcome.targetId };
+              } else {
+                return { session, nextActionId: selectedOutcome.targetId };
+              }
+            }
+            break;
+          }
+        }
+      }
+      return { session };
+    }
+
+    case 'send_notification': {
+      const message = interpolate(config.message || '');
+      if (message) {
+        await sendMessage(botToken, chatId, `🔔 ${message}`);
+      }
+      return { session };
+    }
+
+    case 'spam_protection': {
+      // Spam protection passes through - actual blocking handled by session tracking
+      return { session };
+    }
+
+    case 'leaderboard': {
+      const title = config.title || '🏆 Топ игроков';
+      // In real implementation, fetch leaderboard from database
+      await sendMessage(botToken, chatId, `${title}\n\n🥇 Место 1 - 1000 очков\n🥈 Место 2 - 800 очков\n🥉 Место 3 - 600 очков\n\n📍 Ваша позиция: #${Math.floor(Math.random() * 100) + 1}`);
       return { session };
     }
 

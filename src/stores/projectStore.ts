@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { BotProject, BotMenu, BotButton, BotAction, BotActionNode, ActionType, MAX_MENUS_PER_PROJECT, MAX_BUTTONS_PER_MENU, MAX_BUTTONS_PER_ROW, MAX_ACTION_NODES_PER_PROJECT } from '@/types/bot';
+import { BotProject, BotMenu, BotButton, BotAction, BotActionNode, ActionType, MAX_MENUS_PER_PROJECT, MAX_BUTTONS_PER_MENU, MAX_ACTION_NODES_PER_PROJECT } from '@/types/bot';
 import { createTemplateProject } from '@/lib/bot-templates';
 
 interface ProjectStore {
@@ -13,16 +13,17 @@ interface ProjectStore {
   justMovedButtonId: string | null;
 
   createProject: (name: string, description?: string, templateId?: string) => BotProject;
-  deleteProject: (projectId: string) => void;
   duplicateProject: (projectId: string) => BotProject | null;
+  deleteProject: (projectId: string) => void;
+  updateProject: (projectId: string, updates: Partial<BotProject>) => void;
+  restoreProject: (project: BotProject) => void;
   setCurrentProject: (projectId: string | null) => void;
   getCurrentProject: () => BotProject | null;
-  restoreProject: (project: BotProject) => void;
 
   addMenu: (parentId?: string) => BotMenu | null;
+  duplicateMenu: (menuId: string) => BotMenu | null;
   updateMenu: (menuId: string, updates: Partial<BotMenu>) => void;
   deleteMenu: (menuId: string) => void;
-  duplicateMenu: (menuId: string) => BotMenu | null;
   setCurrentMenu: (menuId: string | null) => void;
   getCurrentMenu: () => BotMenu | null;
 
@@ -31,17 +32,17 @@ interface ProjectStore {
   deleteButton: (menuId: string, buttonId: string) => void;
   setSelectedButton: (buttonId: string | null) => void;
   moveButton: (menuId: string, buttonId: string, direction: 'up' | 'down' | 'left' | 'right') => void;
-  compactButtonRows: (menuId: string) => void;
 
-  addAction: (menuId: string, buttonId: string, actionType: ActionType) => BotAction | null;
+  addAction: (menuId: string, buttonId: string, action: BotAction) => void;
   updateAction: (menuId: string, buttonId: string, actionId: string, updates: Partial<BotAction>) => void;
   deleteAction: (menuId: string, buttonId: string, actionId: string) => void;
+  compactButtonRows: (menuId: string) => void;
 
-  addActionNode: (type: ActionType, position?: { x: number; y: number }) => BotActionNode | null;
-  updateActionNode: (nodeId: string, updates: Partial<BotActionNode>) => void;
-  deleteActionNode: (nodeId: string) => void;
-  duplicateActionNode: (nodeId: string) => BotActionNode | null;
-  setSelectedActionNode: (nodeId: string | null) => void;
+  addActionNode: (type: ActionType, position: { x: number; y: number }) => BotActionNode | null;
+  updateActionNode: (actionNodeId: string, updates: Partial<BotActionNode>) => void;
+  deleteActionNode: (actionNodeId: string) => void;
+  duplicateActionNode: (actionNodeId: string) => BotActionNode | null;
+  setSelectedActionNode: (actionNodeId: string | null) => void;
 }
 
 const createDefaultMenu = (name: string, parentId?: string): BotMenu => ({
@@ -62,20 +63,6 @@ const createDefaultButton = (text: string, row: number, order: number): BotButto
   actions: [],
 });
 
-const createDefaultAction = (type: ActionType, order: number): BotAction => ({
-  id: uuidv4(),
-  type,
-  order,
-  config: {},
-});
-
-const createDefaultActionNode = (type: ActionType, position: { x: number; y: number }): BotActionNode => ({
-  id: uuidv4(),
-  type,
-  config: {},
-  position,
-});
-
 export const useProjectStore = create<ProjectStore>()(
   persist(
     (set, get) => ({
@@ -88,19 +75,14 @@ export const useProjectStore = create<ProjectStore>()(
 
       createProject: (name, description, templateId = 'blank') => {
         const project = createTemplateProject(templateId, name, description);
+
         set((state) => ({
           projects: [...state.projects, project],
           currentProjectId: project.id,
           currentMenuId: project.rootMenuId,
         }));
-        return project;
-      },
 
-      deleteProject: (projectId) => {
-        set((state) => ({
-          projects: state.projects.filter((p) => p.id !== projectId),
-          currentProjectId: state.currentProjectId === projectId ? null : state.currentProjectId,
-        }));
+        return project;
       },
 
       duplicateProject: (projectId) => {
@@ -108,26 +90,25 @@ export const useProjectStore = create<ProjectStore>()(
         if (!project) return null;
 
         const menuIdMap = new Map<string, string>();
-        project.menus.forEach((m) => menuIdMap.set(m.id, uuidv4()));
 
-        const newMenus = project.menus.map((m) => ({
-          ...m,
-          id: menuIdMap.get(m.id)!,
-          parentId: m.parentId ? menuIdMap.get(m.parentId) : undefined,
-          buttons: m.buttons.map((b) => ({
-            ...b,
-            id: uuidv4(),
-            targetMenuId: b.targetMenuId ? menuIdMap.get(b.targetMenuId) : undefined,
-          })),
-        }));
+        const newMenus = project.menus.map((menu) => {
+          const newId = uuidv4();
+          menuIdMap.set(menu.id, newId);
+          return { ...menu, id: newId };
+        });
+
+        newMenus.forEach((menu) => {
+          if (menu.parentId) {
+            menu.parentId = menuIdMap.get(menu.parentId);
+          }
+        });
 
         const newProject: BotProject = {
           ...project,
           id: uuidv4(),
           name: `${project.name} (копия)`,
           menus: newMenus,
-          rootMenuId: menuIdMap.get(project.rootMenuId)!,
-          actionNodes: project.actionNodes?.map((an) => ({ ...an, id: uuidv4() })),
+          rootMenuId: menuIdMap.get(project.rootMenuId) || newMenus[0].id,
           createdAt: new Date(),
           updatedAt: new Date(),
           status: 'draft',
@@ -137,19 +118,19 @@ export const useProjectStore = create<ProjectStore>()(
         return newProject;
       },
 
-      setCurrentProject: (projectId) => {
-        const project = get().projects.find((p) => p.id === projectId);
-        set({
-          currentProjectId: projectId,
-          currentMenuId: project?.rootMenuId || null,
-          selectedButtonId: null,
-          selectedActionNodeId: null,
-        });
+      deleteProject: (projectId) => {
+        set((state) => ({
+          projects: state.projects.filter((p) => p.id !== projectId),
+          currentProjectId: state.currentProjectId === projectId ? null : state.currentProjectId,
+        }));
       },
 
-      getCurrentProject: () => {
-        const { projects, currentProjectId } = get();
-        return projects.find((p) => p.id === currentProjectId) || null;
+      updateProject: (projectId, updates) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === projectId ? { ...p, ...updates, updatedAt: new Date() } : p
+          ),
+        }));
       },
 
       restoreProject: (project) => {
@@ -160,16 +141,31 @@ export const useProjectStore = create<ProjectStore>()(
         }));
       },
 
+      setCurrentProject: (projectId) => {
+        const project = get().projects.find((p) => p.id === projectId);
+        set({
+          currentProjectId: projectId,
+          currentMenuId: project?.rootMenuId || null,
+          selectedButtonId: null,
+        });
+      },
+
+      getCurrentProject: () => {
+        const { projects, currentProjectId } = get();
+        return projects.find((p) => p.id === currentProjectId) || null;
+      },
+
       addMenu: (parentId) => {
         const project = get().getCurrentProject();
-        if (!project || project.menus.length >= MAX_MENUS_PER_PROJECT) return null;
+        if (!project) return null;
 
-        const lastMenu = project.menus[project.menus.length - 1];
+        // Check menu limit
+        if (project.menus.length >= MAX_MENUS_PER_PROJECT) {
+          console.warn(`Maximum menu limit reached (${MAX_MENUS_PER_PROJECT})`);
+          return null;
+        }
+
         const menu = createDefaultMenu('Новое меню', parentId);
-        menu.position = {
-          x: (lastMenu?.position?.x || 0) + 350,
-          y: lastMenu?.position?.y || 100,
-        };
 
         set((state) => ({
           projects: state.projects.map((p) =>
@@ -179,7 +175,47 @@ export const useProjectStore = create<ProjectStore>()(
           ),
           currentMenuId: menu.id,
         }));
+
         return menu;
+      },
+
+      duplicateMenu: (menuId) => {
+        const project = get().getCurrentProject();
+        if (!project) return null;
+
+        const menuToDuplicate = project.menus.find((m) => m.id === menuId);
+        if (!menuToDuplicate) return null;
+
+        const newMenuId = uuidv4();
+        const newButtons = menuToDuplicate.buttons.map((button) => ({
+          ...button,
+          id: uuidv4(),
+          targetMenuId: undefined,
+          targetActionId: undefined,
+          labelPosition: undefined,
+        }));
+
+        const newMenu: BotMenu = {
+          ...menuToDuplicate,
+          id: newMenuId,
+          name: `${menuToDuplicate.name} (копия)`,
+          buttons: newButtons,
+          position: {
+            x: (menuToDuplicate.position?.x || 0) + 50,
+            y: (menuToDuplicate.position?.y || 0) + 50,
+          },
+        };
+
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === project.id
+              ? { ...p, menus: [...p.menus, newMenu], updatedAt: new Date() }
+              : p
+          ),
+          currentMenuId: newMenu.id,
+        }));
+
+        return newMenu;
       },
 
       updateMenu: (menuId, updates) => {
@@ -206,55 +242,36 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           projects: state.projects.map((p) => {
             if (p.id !== project.id) return p;
-            const updatedMenus = p.menus
-              .filter((m) => m.id !== menuId)
-              .map((m) => ({
-                ...m,
-                buttons: m.buttons.map((b) =>
-                  b.targetMenuId === menuId ? { ...b, targetMenuId: undefined } : b
-                ),
-              }));
-            return { ...p, menus: updatedMenus, updatedAt: new Date() };
+
+            const remainingMenus = p.menus.filter((m) => m.id !== menuId);
+
+            const cleanedMenus = remainingMenus.map((m) => {
+              const cleanedButtons = m.buttons.map((b) => {
+                const shouldClearTarget = b.targetMenuId === menuId;
+                if (!shouldClearTarget) return b;
+
+                return {
+                  ...b,
+                  targetMenuId: undefined,
+                };
+              });
+
+              return { ...m, buttons: cleanedButtons };
+            });
+
+            return {
+              ...p,
+              menus: cleanedMenus,
+              updatedAt: new Date(),
+            };
           }),
           currentMenuId: state.currentMenuId === menuId ? project.rootMenuId : state.currentMenuId,
         }));
       },
 
-      duplicateMenu: (menuId) => {
-        const project = get().getCurrentProject();
-        if (!project) return null;
-
-        const menuToDuplicate = project.menus.find((m) => m.id === menuId);
-        if (!menuToDuplicate) return null;
-
-        const newMenu: BotMenu = {
-          ...menuToDuplicate,
-          id: uuidv4(),
-          name: `${menuToDuplicate.name} (копия)`,
-          buttons: menuToDuplicate.buttons.map((b) => ({
-            ...b,
-            id: uuidv4(),
-            actions: b.actions.map((a) => ({ ...a, id: uuidv4() })),
-          })),
-          position: {
-            x: (menuToDuplicate.position?.x || 0) + 50,
-            y: (menuToDuplicate.position?.y || 0) + 50,
-          },
-        };
-
-        set((state) => ({
-          projects: state.projects.map((p) =>
-            p.id === project.id
-              ? { ...p, menus: [...p.menus, newMenu], updatedAt: new Date() }
-              : p
-          ),
-          currentMenuId: newMenu.id,
-        }));
-
-        return newMenu;
+      setCurrentMenu: (menuId) => {
+        set({ currentMenuId: menuId, selectedButtonId: null });
       },
-
-      setCurrentMenu: (menuId) => set({ currentMenuId: menuId, selectedButtonId: null }),
 
       getCurrentMenu: () => {
         const project = get().getCurrentProject();
@@ -267,11 +284,15 @@ export const useProjectStore = create<ProjectStore>()(
         if (!project) return null;
 
         const menu = project.menus.find((m) => m.id === menuId);
-        if (!menu || menu.buttons.length >= MAX_BUTTONS_PER_MENU) return null;
+        if (!menu) return null;
+
+        // Check button limit per menu
+        if (menu.buttons.length >= MAX_BUTTONS_PER_MENU) {
+          console.warn(`Maximum button limit reached for menu (${MAX_BUTTONS_PER_MENU})`);
+          return null;
+        }
 
         const buttonsInRow = menu.buttons.filter((b) => b.row === row);
-        if (buttonsInRow.length >= MAX_BUTTONS_PER_ROW) return null;
-
         const button = createDefaultButton('Кнопка', row, buttonsInRow.length);
 
         set((state) => ({
@@ -340,7 +361,9 @@ export const useProjectStore = create<ProjectStore>()(
         }));
       },
 
-      setSelectedButton: (buttonId) => set({ selectedButtonId: buttonId }),
+      setSelectedButton: (buttonId) => {
+        set({ selectedButtonId: buttonId });
+      },
 
       moveButton: (menuId, buttonId, direction) => {
         const project = get().getCurrentProject();
@@ -352,86 +375,104 @@ export const useProjectStore = create<ProjectStore>()(
         const button = menu.buttons.find((b) => b.id === buttonId);
         if (!button) return;
 
+        const buttonsInSameRow = menu.buttons.filter((b) => b.row === button.row).sort((a, b) => a.order - b.order);
+        const buttonIndex = buttonsInSameRow.findIndex((b) => b.id === buttonId);
+
         let newRow = button.row;
-        let newOrder = button.order;
+        const maxAllowedRow = menu.buttons.length - 1;
 
-        const buttonsInCurrentRow = menu.buttons.filter((b) => b.row === button.row).sort((a, b) => a.order - b.order);
-
-        switch (direction) {
-          case 'up':
-            if (button.row > 0) newRow = button.row - 1;
-            break;
-          case 'down':
-            newRow = button.row + 1;
-            break;
-          case 'left':
-            if (button.order > 0) {
-              const prevButton = buttonsInCurrentRow.find((b) => b.order === button.order - 1);
-              if (prevButton) {
-                newOrder = prevButton.order;
-                get().updateButton(menuId, prevButton.id, { order: button.order });
-              }
-            }
-            break;
-          case 'right':
-            if (button.order < buttonsInCurrentRow.length - 1) {
-              const nextButton = buttonsInCurrentRow.find((b) => b.order === button.order + 1);
-              if (nextButton) {
-                newOrder = nextButton.order;
-                get().updateButton(menuId, nextButton.id, { order: button.order });
-              }
-            }
-            break;
+        if (direction === 'up' && button.row > 0) {
+          newRow = button.row - 1;
+        } else if (direction === 'down' && button.row < maxAllowedRow) {
+          newRow = button.row + 1;
+        } else if (direction === 'left' && buttonIndex > 0) {
+          const prevButton = buttonsInSameRow[buttonIndex - 1];
+          set((state) => ({
+            projects: state.projects.map((p) =>
+              p.id === project.id
+                ? {
+                    ...p,
+                    menus: p.menus.map((m) =>
+                      m.id === menuId
+                        ? {
+                            ...m,
+                            buttons: m.buttons.map((b) => {
+                              if (b.id === buttonId) return { ...b, order: prevButton.order };
+                              if (b.id === prevButton.id) return { ...b, order: button.order };
+                              return b;
+                            }),
+                          }
+                        : m
+                    ),
+                    updatedAt: new Date(),
+                  }
+                : p
+            ),
+            justMovedButtonId: buttonId,
+          }));
+          setTimeout(() => set({ justMovedButtonId: null }), 1000);
+          return;
+        } else if (direction === 'right' && buttonIndex < buttonsInSameRow.length - 1) {
+          const nextButton = buttonsInSameRow[buttonIndex + 1];
+          set((state) => ({
+            projects: state.projects.map((p) =>
+              p.id === project.id
+                ? {
+                    ...p,
+                    menus: p.menus.map((m) =>
+                      m.id === menuId
+                        ? {
+                            ...m,
+                            buttons: m.buttons.map((b) => {
+                              if (b.id === buttonId) return { ...b, order: nextButton.order };
+                              if (b.id === nextButton.id) return { ...b, order: button.order };
+                              return b;
+                            }),
+                          }
+                        : m
+                    ),
+                    updatedAt: new Date(),
+                  }
+                : p
+            ),
+            justMovedButtonId: buttonId,
+          }));
+          setTimeout(() => set({ justMovedButtonId: null }), 1000);
+          return;
+        } else {
+          return;
         }
 
-        if (direction === 'up' || direction === 'down') {
-          const buttonsInNewRow = menu.buttons.filter((b) => b.row === newRow);
-          if (buttonsInNewRow.length >= MAX_BUTTONS_PER_ROW) return;
-          newOrder = buttonsInNewRow.length;
-        }
+        const buttonsInNewRow = menu.buttons.filter((b) => b.row === newRow);
+        const newOrderInRow = buttonsInNewRow.length;
 
-        get().updateButton(menuId, buttonId, { row: newRow, order: newOrder });
-        set({ justMovedButtonId: buttonId });
-        setTimeout(() => set({ justMovedButtonId: null }), 500);
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === project.id
+              ? {
+                  ...p,
+                  menus: p.menus.map((m) =>
+                    m.id === menuId
+                      ? {
+                          ...m,
+                          buttons: m.buttons.map((b) =>
+                            b.id === buttonId ? { ...b, row: newRow, order: newOrderInRow } : b
+                          ),
+                        }
+                      : m
+                  ),
+                  updatedAt: new Date(),
+                }
+              : p
+          ),
+          justMovedButtonId: buttonId,
+        }));
+        setTimeout(() => set({ justMovedButtonId: null }), 1000);
       },
 
-      compactButtonRows: (menuId) => {
+      addAction: (menuId, buttonId, action) => {
         const project = get().getCurrentProject();
         if (!project) return;
-
-        const menu = project.menus.find((m) => m.id === menuId);
-        if (!menu) return;
-
-        const rows = new Map<number, BotButton[]>();
-        menu.buttons.forEach((b) => {
-          if (!rows.has(b.row)) rows.set(b.row, []);
-          rows.get(b.row)!.push(b);
-        });
-
-        const sortedRowKeys = Array.from(rows.keys()).sort((a, b) => a - b);
-        const updatedButtons: BotButton[] = [];
-
-        sortedRowKeys.forEach((oldRow, newRow) => {
-          const buttonsInRow = rows.get(oldRow)!.sort((a, b) => a.order - b.order);
-          buttonsInRow.forEach((b, order) => {
-            updatedButtons.push({ ...b, row: newRow, order });
-          });
-        });
-
-        get().updateMenu(menuId, { buttons: updatedButtons });
-      },
-
-      addAction: (menuId, buttonId, actionType) => {
-        const project = get().getCurrentProject();
-        if (!project) return null;
-
-        const menu = project.menus.find((m) => m.id === menuId);
-        if (!menu) return null;
-
-        const button = menu.buttons.find((b) => b.id === buttonId);
-        if (!button) return null;
-
-        const action = createDefaultAction(actionType, button.actions.length);
 
         set((state) => ({
           projects: state.projects.map((p) =>
@@ -455,8 +496,6 @@ export const useProjectStore = create<ProjectStore>()(
               : p
           ),
         }));
-
-        return action;
       },
 
       updateAction: (menuId, buttonId, actionId, updates) => {
@@ -507,7 +546,10 @@ export const useProjectStore = create<ProjectStore>()(
                           ...m,
                           buttons: m.buttons.map((b) =>
                             b.id === buttonId
-                              ? { ...b, actions: b.actions.filter((a) => a.id !== actionId) }
+                              ? {
+                                  ...b,
+                                  actions: b.actions.filter((a) => a.id !== actionId),
+                                }
                               : b
                           ),
                         }
@@ -520,12 +562,53 @@ export const useProjectStore = create<ProjectStore>()(
         }));
       },
 
-      addActionNode: (type, position = { x: 100, y: 100 }) => {
+      compactButtonRows: (menuId) => {
+        const project = get().getCurrentProject();
+        if (!project) return;
+
+        const menu = project.menus.find((m) => m.id === menuId);
+        if (!menu) return;
+
+        const usedRows = [...new Set(menu.buttons.map((b) => b.row))].sort((a, b) => a - b);
+        const rowMapping = new Map<number, number>();
+        usedRows.forEach((oldRow, index) => rowMapping.set(oldRow, index));
+
+        const compactedButtons = menu.buttons.map((b) => ({
+          ...b,
+          row: rowMapping.get(b.row) ?? b.row,
+        }));
+
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === project.id
+              ? {
+                  ...p,
+                  menus: p.menus.map((m) =>
+                    m.id === menuId ? { ...m, buttons: compactedButtons } : m
+                  ),
+                  updatedAt: new Date(),
+                }
+              : p
+          ),
+        }));
+      },
+
+      addActionNode: (type, position) => {
         const project = get().getCurrentProject();
         if (!project) return null;
-        if ((project.actionNodes || []).length >= MAX_ACTION_NODES_PER_PROJECT) return null;
 
-        const actionNode = createDefaultActionNode(type, position);
+        // Check action node limit
+        if ((project.actionNodes || []).length >= MAX_ACTION_NODES_PER_PROJECT) {
+          console.warn(`Maximum action node limit reached (${MAX_ACTION_NODES_PER_PROJECT})`);
+          return null;
+        }
+
+        const actionNode: BotActionNode = {
+          id: uuidv4(),
+          type,
+          config: {},
+          position,
+        };
 
         set((state) => ({
           projects: state.projects.map((p) =>
@@ -543,7 +626,7 @@ export const useProjectStore = create<ProjectStore>()(
         return actionNode;
       },
 
-      updateActionNode: (nodeId, updates) => {
+      updateActionNode: (actionNodeId, updates) => {
         const project = get().getCurrentProject();
         if (!project) return;
 
@@ -553,7 +636,7 @@ export const useProjectStore = create<ProjectStore>()(
               ? {
                   ...p,
                   actionNodes: (p.actionNodes || []).map((an) =>
-                    an.id === nodeId ? { ...an, ...updates } : an
+                    an.id === actionNodeId ? { ...an, ...updates } : an
                   ),
                   updatedAt: new Date(),
                 }
@@ -562,47 +645,48 @@ export const useProjectStore = create<ProjectStore>()(
         }));
       },
 
-      deleteActionNode: (nodeId) => {
+      deleteActionNode: (actionNodeId) => {
         const project = get().getCurrentProject();
         if (!project) return;
 
         set((state) => ({
-          projects: state.projects.map((p) => {
-            if (p.id !== project.id) return p;
-            const updatedMenus = p.menus.map((m) => ({
-              ...m,
-              buttons: m.buttons.map((b) =>
-                b.targetActionId === nodeId ? { ...b, targetActionId: undefined } : b
-              ),
-            }));
-            const updatedActionNodes = (p.actionNodes || [])
-              .filter((an) => an.id !== nodeId)
-              .map((an) =>
-                an.nextNodeId === nodeId ? { ...an, nextNodeId: undefined, nextNodeType: undefined } : an
-              );
-            return { ...p, menus: updatedMenus, actionNodes: updatedActionNodes, updatedAt: new Date() };
-          }),
+          projects: state.projects.map((p) =>
+            p.id === project.id
+              ? {
+                  ...p,
+                  actionNodes: (p.actionNodes || []).filter((an) => an.id !== actionNodeId),
+                  menus: p.menus.map((m) => ({
+                    ...m,
+                    buttons: m.buttons.map((b) =>
+                      b.targetActionId === actionNodeId
+                        ? { ...b, targetActionId: undefined }
+                        : b
+                    ),
+                  })),
+                  updatedAt: new Date(),
+                }
+              : p
+          ),
           selectedActionNodeId:
-            state.selectedActionNodeId === nodeId ? null : state.selectedActionNodeId,
+            state.selectedActionNodeId === actionNodeId ? null : state.selectedActionNodeId,
         }));
       },
 
-      duplicateActionNode: (nodeId) => {
+      duplicateActionNode: (actionNodeId) => {
         const project = get().getCurrentProject();
         if (!project) return null;
 
-        const nodeToDuplicate = project.actionNodes?.find((an) => an.id === nodeId);
-        if (!nodeToDuplicate) return null;
+        const originalNode = (project.actionNodes || []).find((an) => an.id === actionNodeId);
+        if (!originalNode) return null;
 
-        const newNode: BotActionNode = {
-          ...nodeToDuplicate,
+        const duplicatedNode: BotActionNode = {
           id: uuidv4(),
+          type: originalNode.type,
+          config: { ...originalNode.config },
           position: {
-            x: nodeToDuplicate.position.x + 50,
-            y: nodeToDuplicate.position.y + 50,
+            x: originalNode.position.x + 50,
+            y: originalNode.position.y + 50,
           },
-          nextNodeId: undefined,
-          nextNodeType: undefined,
         };
 
         set((state) => ({
@@ -610,21 +694,23 @@ export const useProjectStore = create<ProjectStore>()(
             p.id === project.id
               ? {
                   ...p,
-                  actionNodes: [...(p.actionNodes || []), newNode],
+                  actionNodes: [...(p.actionNodes || []), duplicatedNode],
                   updatedAt: new Date(),
                 }
               : p
           ),
-          selectedActionNodeId: newNode.id,
+          selectedActionNodeId: duplicatedNode.id,
         }));
 
-        return newNode;
+        return duplicatedNode;
       },
 
-      setSelectedActionNode: (nodeId) => set({ selectedActionNodeId: nodeId, selectedButtonId: null }),
+      setSelectedActionNode: (actionNodeId) => {
+        set({ selectedActionNodeId: actionNodeId });
+      },
     }),
     {
-      name: 'bot-builder-projects',
+      name: 'bot-builder-storage',
     }
   )
 );

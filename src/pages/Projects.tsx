@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Copy, ChevronLeft, Bot, Calendar } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronLeft, Bot, Calendar, Loader2 } from 'lucide-react';
 import { useProjectStore } from '@/stores/projectStore';
 import { Button } from '@/components/ui/button';
+import { useTelegram } from '@/contexts/TelegramContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,10 +20,16 @@ import {
 export default function Projects() {
   const navigate = useNavigate();
   const { projects, deleteProject, duplicateProject, setCurrentProject } = useProjectStore();
+  const { isLoading: isTgLoading, isTelegramWebApp, telegramUser, profile } = useTelegram();
 
   const handleOpenProject = (projectId: string) => {
     setCurrentProject(projectId);
     navigate(`/builder/${projectId}`);
+  };
+
+  const handleDuplicate = (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation();
+    duplicateProject(projectId);
   };
 
   const formatDate = (date: Date) => {
@@ -32,8 +40,21 @@ export default function Projects() {
     });
   };
 
+  if (isTgLoading && isTelegramWebApp) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
+
+
   return (
-    <div className="min-h-screen bg-background safe-area-top safe-area-bottom">
+    <div className="min-h-screen bg-background safe-area-top safe-area-bottom" style={{ minHeight: 'var(--tg-viewport-stable-height, 100vh)' }}>
+      {/* Header */}
       <div className="sticky top-0 z-10 bg-card/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -43,14 +64,30 @@ export default function Projects() {
               </Button>
               <h1 className="text-xl font-semibold text-foreground">Мои проекты</h1>
             </div>
-            <Button onClick={() => navigate('/')} className="telegram-button">
-              <Plus className="w-4 h-4 mr-2" />
-              Новый проект
-            </Button>
+            <div className="flex items-center gap-3">
+              {telegramUser && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground hidden sm:block">
+                    {telegramUser.first_name}
+                  </span>
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src={profile?.photo_url || undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                      {telegramUser.first_name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              )}
+              <Button onClick={() => navigate('/')} className="telegram-button">
+                <Plus className="w-4 h-4 mr-2" />
+                Новый проект
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Projects list */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {projects.length === 0 ? (
           <motion.div
@@ -99,10 +136,7 @@ export default function Projects() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        duplicateProject(project.id);
-                      }}
+                      onClick={(e) => handleDuplicate(e, project.id)}
                     >
                       <Copy className="w-4 h-4" />
                     </Button>
@@ -153,10 +187,12 @@ export default function Projects() {
                   <div className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
                     project.status === 'draft' ? 'bg-muted text-muted-foreground' :
                     project.status === 'testing' ? 'bg-telegram-orange/20 text-telegram-orange' :
-                    'bg-telegram-green/20 text-telegram-green'
+                    project.status === 'completed' ? 'bg-telegram-green/20 text-telegram-green' :
+                    'bg-primary/20 text-primary'
                   }`}>
                     {project.status === 'draft' ? 'Черновик' :
-                     project.status === 'testing' ? 'Тестирование' : 'Готов'}
+                     project.status === 'testing' ? 'Тестирование' :
+                     project.status === 'completed' ? 'Готов' : 'Экспортирован'}
                   </div>
                 </div>
               </motion.div>

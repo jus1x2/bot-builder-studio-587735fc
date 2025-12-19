@@ -62,7 +62,7 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            isRoot ? 'bg-green-500/20 text-green-500' : 'bg-primary/10 text-primary'
+            isRoot ? 'bg-telegram-green/20 text-telegram-green' : 'bg-primary/10 text-primary'
           }`}>
             <MessageSquare className="w-4 h-4" />
           </div>
@@ -135,7 +135,7 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
                               : 'shadow-sm'
                           } ${
                             hasConnection
-                              ? 'bg-green-500/90 text-primary-foreground border-green-500'
+                              ? 'bg-telegram-green/90 text-primary-foreground border-telegram-green'
                               : 'bg-primary/90 text-primary-foreground border-primary'
                           }`}
                         >
@@ -147,7 +147,7 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
                           id={button.id}
                           className={`!w-3.5 !h-3.5 !border-[2px] !border-card !rounded-full !shadow-md transition-all ${
                             hasConnection
-                              ? '!bg-green-500'
+                              ? '!bg-telegram-green'
                               : '!bg-primary hover:!bg-primary hover:!scale-125'
                           }`}
                           style={{
@@ -172,7 +172,7 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
       )}
 
       {isRoot && (
-        <div className="absolute -top-2 -left-2 bg-green-500 text-primary-foreground text-[10px] font-medium px-2 py-0.5 rounded-full shadow-sm">
+        <div className="absolute -top-2 -left-2 bg-telegram-green text-primary-foreground text-[10px] font-medium px-2 py-0.5 rounded-full shadow-sm">
           Старт
         </div>
       )}

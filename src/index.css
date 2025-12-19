@@ -311,11 +311,11 @@ html, body {
       @apply min-w-[180px] max-w-[220px] p-3;
       transform-origin: center center;
     }
-
+    
     .react-flow__controls {
       @apply !bottom-20 !left-2 !right-auto;
     }
-
+    
     .react-flow__minimap {
       @apply !hidden;
     }

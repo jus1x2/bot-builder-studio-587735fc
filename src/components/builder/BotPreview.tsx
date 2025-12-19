@@ -4,6 +4,7 @@ import { ChevronLeft, MoreVertical, Send } from 'lucide-react';
 import { BotMenu, BotButton, BotActionNode } from '@/types/bot';
 import { interpolateVariables, UserContext } from '@/hooks/useActionExecutor';
 
+// Simple Telegram-style markdown parser
 function parseMarkdown(text: string): React.ReactNode[] {
   const lines = text.split('\n');
 
@@ -50,6 +51,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
   }).flat();
 }
 
+// Typing animation hook
 function useTypingAnimation(text: string, speed: number = 30) {
   const [displayedText, setDisplayedText] = useState('');
   const [isComplete, setIsComplete] = useState(false);
@@ -77,6 +79,7 @@ function useTypingAnimation(text: string, speed: number = 30) {
   return { displayedText, isComplete };
 }
 
+// Typing indicator component
 function TypingIndicator() {
   return (
     <motion.div
@@ -250,7 +253,7 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
 
   if (!menu) {
     return (
-      <div ref={ref} className="h-full flex flex-col bg-muted/30 overflow-hidden">
+      <div ref={ref} className="h-full flex flex-col bg-surface-overlay overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 bg-card border-b border-border">
           <button className="text-muted-foreground/50"><ChevronLeft className="w-5 h-5" /></button>
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
@@ -313,7 +316,7 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
   };
 
   return (
-    <div ref={ref} className="h-full flex flex-col bg-muted/30 overflow-hidden">
+    <div ref={ref} className="h-full flex flex-col bg-surface-overlay overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 bg-card border-b border-border">
         <button onClick={handleBack} disabled={!canGoBack} className={`transition-colors ${canGoBack ? 'text-primary hover:text-primary/80' : 'text-muted-foreground/50'}`}>
           <ChevronLeft className="w-5 h-5" />

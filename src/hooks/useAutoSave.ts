@@ -1,54 +1,62 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { BotProject } from '@/types/bot';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+export type SaveStatus = 'idle' | 'saving' | 'saved';
 
-export function useAutoSave(project: BotProject | null, interval = 30000) {
+export function useAutoSave(
+  data: unknown,
+  intervalMs: number = 30000
+) {
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastProjectRef = useRef<string | null>(null);
+  const previousDataRef = useRef<string | null>(null);
 
-  const save = useCallback(async () => {
-    if (!project) return;
-
-    const projectJson = JSON.stringify(project);
-    if (projectJson === lastProjectRef.current) return;
-
+  const performSave = useCallback(() => {
+    const currentData = JSON.stringify(data);
+    
+    // Only save if data has changed
+    if (previousDataRef.current === currentData) {
+      return;
+    }
+    
+    previousDataRef.current = currentData;
     setStatus('saving');
     
-    // Simulate save delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    
-    lastProjectRef.current = projectJson;
-    setStatus('saved');
-    setLastSaved(new Date());
-
-    setTimeout(() => setStatus('idle'), 2000);
-  }, [project]);
-
-  const forceSave = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    save();
-  }, [save]);
+    // Simulate save (zustand persist handles actual storage)
+    setTimeout(() => {
+      setStatus('saved');
+      setLastSaved(new Date());
+      
+      // Reset to idle after showing "saved" state
+      setTimeout(() => {
+        setStatus('idle');
+      }, 2000);
+    }, 500);
+  }, [data]);
 
   useEffect(() => {
-    if (!project) return;
-
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+    // Initial data capture
+    if (previousDataRef.current === null && data) {
+      previousDataRef.current = JSON.stringify(data);
     }
+  }, [data]);
 
-    timeoutRef.current = setTimeout(save, interval);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      performSave();
+    }, intervalMs);
 
+    return () => clearInterval(interval);
+  }, [performSave, intervalMs]);
+
+  // Save on unmount if there are changes
+  useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      const currentData = JSON.stringify(data);
+      if (previousDataRef.current !== currentData) {
+        previousDataRef.current = currentData;
       }
     };
-  }, [project, interval, save]);
+  }, [data]);
 
-  return { status, lastSaved, forceSave };
+  return { status, lastSaved, forceSave: performSave };
 }

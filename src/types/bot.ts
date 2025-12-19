@@ -226,6 +226,6 @@ export const ACTION_INFO: Record<ActionType, { name: string; description: string
   on_timer: { name: 'По таймеру', description: 'Отложенное', icon: 'Timer' },
   on_threshold: { name: 'По порогу', description: 'При достижении', icon: 'Target' },
   send_notification: { name: 'Уведомление', description: 'Push в Telegram', icon: 'Bell' },
-  schedule_message: { name: 'Запланировать', description: 'Отложенная отправка', icon: 'Calendar' },
+  schedule_message: { name: 'Таймер', description: 'Отложенный запуск', icon: 'Timer' },
   broadcast: { name: 'Рассылка', description: 'Массовая отправка', icon: 'Send' },
 };

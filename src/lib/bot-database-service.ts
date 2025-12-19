@@ -47,6 +47,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
         menu_order: menu.order || 0,
         keyword_triggers: menu.keywordTriggers || [],
         settings: menu.settings || {},
+        media_url: menu.mediaUrl || null,
       });
 
       if (menuError) {
@@ -176,6 +177,7 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
         position: { x: menu.position_x || 0, y: menu.position_y || 0 },
         keywordTriggers: menu.keyword_triggers || [],
         settings: (menu.settings as any) || {},
+        mediaUrl: menu.media_url || undefined,
       };
     });
 

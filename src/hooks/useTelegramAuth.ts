@@ -24,6 +24,9 @@ export interface Profile {
   last_activity_at: string;
 }
 
+// Demo user ID for development mode
+const DEMO_TELEGRAM_ID = 'demo_user_12345';
+
 // TelegramWebApp interface is defined in vite-env.d.ts
 
 export function useTelegramAuth() {
@@ -33,6 +36,56 @@ export function useTelegramAuth() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Create or get demo profile for development mode
+  const createDemoProfile = useCallback(async () => {
+    try {
+      // Check if demo profile exists
+      const { data: existingProfile, error: selectError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('telegram_id', DEMO_TELEGRAM_ID)
+        .maybeSingle();
+
+      if (selectError) {
+        console.error('Error checking demo profile:', selectError);
+        return null;
+      }
+
+      if (existingProfile) {
+        // Update last activity
+        await supabase
+          .from('profiles')
+          .update({ last_activity_at: new Date().toISOString() })
+          .eq('id', existingProfile.id);
+        return existingProfile as Profile;
+      }
+
+      // Create new demo profile
+      const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          telegram_id: DEMO_TELEGRAM_ID,
+          username: 'demo_user',
+          first_name: 'Demo',
+          last_name: 'User',
+          language_code: 'ru',
+          is_premium: false,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error creating demo profile:', insertError);
+        return null;
+      }
+
+      return newProfile as Profile;
+    } catch (err) {
+      console.error('Demo profile error:', err);
+      return null;
+    }
+  }, []);
+
   const authenticate = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -41,8 +94,26 @@ export function useTelegramAuth() {
       const tg = window.Telegram?.WebApp;
       
       if (!tg || !tg.initData) {
-        // Not in Telegram WebApp context
+        // Not in Telegram WebApp context - use demo mode
         setIsTelegramWebApp(false);
+        
+        // Create demo user for development
+        const demoUser: TelegramUser = {
+          id: 12345,
+          first_name: 'Demo',
+          last_name: 'User',
+          username: 'demo_user',
+          language_code: 'ru',
+        };
+        setTelegramUser(demoUser);
+
+        // Create or get demo profile from database
+        const demoProfile = await createDemoProfile();
+        if (demoProfile) {
+          setProfile(demoProfile);
+          console.log('[TelegramAuth] Demo profile loaded:', demoProfile.id);
+        }
+        
         setIsLoading(false);
         return;
       }
@@ -78,7 +149,7 @@ export function useTelegramAuth() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [createDemoProfile]);
 
   useEffect(() => {
     // Wait for Telegram WebApp script to load
@@ -86,9 +157,8 @@ export function useTelegramAuth() {
       if (window.Telegram?.WebApp) {
         authenticate();
       } else {
-        // Not in Telegram context, set loading to false
-        setIsLoading(false);
-        setIsTelegramWebApp(false);
+        // Not in Telegram context - start demo mode
+        authenticate();
       }
     };
 

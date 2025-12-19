@@ -24,46 +24,7 @@ export interface Profile {
   last_activity_at: string;
 }
 
-interface TelegramWebApp {
-  initData: string;
-  initDataUnsafe: {
-    user?: TelegramUser;
-    auth_date?: number;
-    hash?: string;
-  };
-  ready: () => void;
-  expand: () => void;
-  close: () => void;
-  MainButton: {
-    text: string;
-    show: () => void;
-    hide: () => void;
-    onClick: (callback: () => void) => void;
-  };
-  BackButton: {
-    show: () => void;
-    hide: () => void;
-    onClick: (callback: () => void) => void;
-  };
-  themeParams: {
-    bg_color?: string;
-    text_color?: string;
-    hint_color?: string;
-    link_color?: string;
-    button_color?: string;
-    button_text_color?: string;
-    secondary_bg_color?: string;
-  };
-  colorScheme: 'light' | 'dark';
-}
-
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp: TelegramWebApp;
-    };
-  }
-}
+// TelegramWebApp interface is defined in vite-env.d.ts
 
 export function useTelegramAuth() {
   const [isLoading, setIsLoading] = useState(true);

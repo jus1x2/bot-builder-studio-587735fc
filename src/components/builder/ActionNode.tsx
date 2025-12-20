@@ -471,26 +471,8 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
   const nodeMinHeight = isMultiOutput ? Math.max(120, outcomeCount * 35 + 80) : (isIfElse || isLottery ? 140 : undefined);
 
   return (
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ 
-        scale: 1, 
-        opacity: 1,
-        boxShadow: isOrphan
-          ? '0 0 20px 4px rgba(251, 146, 60, 0.5), 0 0 40px 8px rgba(251, 146, 60, 0.25)'
-          : undefined
-      }}
-      transition={{ duration: 0.15, ease: 'easeOut' }}
-      className={`action-node builder-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-colors relative ${colorClasses} ${
-        isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
-      } ${isOrphan ? 'border-orange-400' : ''}`}
-      style={{ 
-        minWidth: hasCustomPreview || isMultiOutput ? 200 : 180, 
-        maxWidth: hasCustomPreview || isMultiOutput ? 240 : 220,
-        minHeight: nodeMinHeight,
-      }}
-    >
-      {/* Connection count badges */}
+    <div className="relative" style={{ marginTop: 12, marginLeft: 12 }}>
+      {/* Connection count badges - outside the node to avoid overflow clipping */}
       {incomingConnections > 0 && (
         <div className="node-connection-badge incoming" title={`${incomingConnections} входящих`}>
           ←{incomingConnections}
@@ -501,6 +483,26 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
           {outgoingConnections}→
         </div>
       )}
+      
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ 
+          scale: 1, 
+          opacity: 1,
+          boxShadow: isOrphan
+            ? '0 0 20px 4px rgba(251, 146, 60, 0.5), 0 0 40px 8px rgba(251, 146, 60, 0.25)'
+            : undefined
+        }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
+        className={`action-node builder-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-colors ${colorClasses} ${
+          isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+        } ${isOrphan ? 'border-orange-400' : ''}`}
+        style={{ 
+          minWidth: hasCustomPreview || isMultiOutput ? 200 : 180, 
+          maxWidth: hasCustomPreview || isMultiOutput ? 240 : 220,
+          minHeight: nodeMinHeight,
+        }}
+      >
       <Handle
         type="target"
         position={Position.Left}
@@ -620,7 +622,8 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
           }}
         />
       ))}
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }
 

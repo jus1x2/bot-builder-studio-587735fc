@@ -72,6 +72,18 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
           </div>
         )}
 
+        {/* Connection count badges - outside the node to avoid overflow clipping */}
+        {incomingConnections > 0 && !isRoot && (
+          <div className="node-connection-badge incoming" title={`${incomingConnections} входящих`}>
+            ←{incomingConnections}
+          </div>
+        )}
+        {outgoingConnections > 0 && (
+          <div className="node-connection-badge outgoing" title={`${outgoingConnections} исходящих`}>
+            {outgoingConnections}→
+          </div>
+        )}
+        
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ 
@@ -82,20 +94,9 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
               : undefined
           }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className={`builder-node node-optimized ${isSelected ? 'selected' : ''} ${isOrphan ? 'orphan-node' : ''} relative`}
+          className={`builder-node node-optimized ${isSelected ? 'selected' : ''} ${isOrphan ? 'orphan-node' : ''}`}
           style={{ minWidth: 220, maxWidth: 280 }}
         >
-          {/* Connection count badges */}
-          {incomingConnections > 0 && !isRoot && (
-            <div className="node-connection-badge incoming" title={`${incomingConnections} входящих`}>
-              ←{incomingConnections}
-            </div>
-          )}
-          {outgoingConnections > 0 && (
-            <div className="node-connection-badge outgoing" title={`${outgoingConnections} исходящих`}>
-              {outgoingConnections}→
-            </div>
-          )}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${

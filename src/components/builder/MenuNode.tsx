@@ -25,7 +25,7 @@ interface MenuNodeProps {
 }
 
 function MenuNodeComponent({ data, selected }: MenuNodeProps) {
-  const { menu, isRoot, isOrphan, isDragging, onEdit, onDelete, onDuplicate, justMovedButtonId } = data;
+  const { menu, isRoot, isOrphan, onEdit, onDelete, onDuplicate, justMovedButtonId } = data;
   const isSelected = selected || data.isSelected;
 
   const buttonRows = useMemo(() => {
@@ -73,16 +73,14 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ 
-            scale: isDragging ? 1.02 : 1, 
+            scale: 1, 
             opacity: 1,
-            boxShadow: isDragging 
-              ? '0 20px 40px -10px rgba(0,0,0,0.25), 0 0 0 2px hsl(var(--primary))' 
-              : isOrphan 
-                ? '0 0 20px 4px hsl(var(--telegram-orange) / 0.4)' 
-                : undefined
+            boxShadow: isOrphan 
+              ? '0 0 20px 4px hsl(var(--telegram-orange) / 0.4)' 
+              : undefined
           }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className={`builder-node node-optimized ${isSelected ? 'selected' : ''} ${isOrphan ? 'orphan-node' : ''} ${isDragging ? 'dragging' : ''}`}
+          className={`builder-node node-optimized ${isSelected ? 'selected' : ''} ${isOrphan ? 'orphan-node' : ''}`}
           style={{ minWidth: 220, maxWidth: 280 }}
         >
           <div className="flex items-center justify-between mb-3">

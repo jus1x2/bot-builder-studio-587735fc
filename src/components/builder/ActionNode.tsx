@@ -22,7 +22,7 @@ interface ActionNodeProps {
 }
 
 function ActionNodeComponent({ data, selected }: ActionNodeProps) {
-  const { actionNode, isDragging, isOrphan, onEdit, onDelete, onDuplicate } = data;
+  const { actionNode, isOrphan, onEdit, onDelete, onDuplicate } = data;
   const isSelected = selected || data.isSelected;
 
   const actionInfo = ACTION_INFO[actionNode.type];
@@ -472,18 +472,16 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ 
-        scale: isDragging ? 1.03 : 1, 
+        scale: 1, 
         opacity: 1,
-        boxShadow: isDragging 
-          ? '0 20px 40px -10px rgba(0,0,0,0.3), 0 0 0 2px hsl(var(--primary))' 
-          : isOrphan
-            ? '0 0 20px 4px rgba(251, 146, 60, 0.5), 0 0 40px 8px rgba(251, 146, 60, 0.25)'
-            : undefined
+        boxShadow: isOrphan
+          ? '0 0 20px 4px rgba(251, 146, 60, 0.5), 0 0 40px 8px rgba(251, 146, 60, 0.25)'
+          : undefined
       }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
-      className={`action-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-colors ${colorClasses} ${
+      className={`action-node builder-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-colors ${colorClasses} ${
         isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
-      } ${isDragging ? 'cursor-grabbing' : ''} ${isOrphan ? 'border-orange-400' : ''}`}
+      } ${isOrphan ? 'border-orange-400' : ''}`}
       style={{ 
         minWidth: hasCustomPreview || isMultiOutput ? 200 : 180, 
         maxWidth: hasCustomPreview || isMultiOutput ? 240 : 220,

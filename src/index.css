@@ -350,7 +350,22 @@ html, body {
 /* React Flow customization */
 .react-flow__node {
   @apply !bg-transparent;
-  transition: z-index 0.15s ease-out, transform 0.1s ease-out;
+  transition: z-index 0.15s ease-out, transform 0.1s ease-out, filter 0.15s ease-out;
+}
+
+/* Node dragging state - React Flow adds .dragging class automatically */
+.react-flow__node.dragging {
+  z-index: 1000 !important;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.25));
+}
+
+.react-flow__node.dragging .builder-node {
+  @apply ring-2 ring-primary;
+  transform: scale(1.02);
+}
+
+.react-flow__node.selected {
+  z-index: 100;
 }
 
 .react-flow__edge-path {

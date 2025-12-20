@@ -291,20 +291,41 @@ export function BuilderCanvas() {
 
     const menuIdSet = new Set(project.menus.map((m) => m.id));
     
-    // Calculate which menus are orphans (no incoming or outgoing connections)
-    const hasOutgoingConnection = new Set<string>();
-    const hasIncomingConnection = new Set<string>();
+    // Calculate connection counts for each menu
+    const incomingConnectionCount = new Map<string, number>();
+    const outgoingConnectionCount = new Map<string, number>();
     
     project.menus.forEach(menu => {
+      let outgoingCount = 0;
       menu.buttons.forEach(button => {
         if (button.targetMenuId && menuIdSet.has(button.targetMenuId)) {
-          hasOutgoingConnection.add(menu.id);
-          hasIncomingConnection.add(button.targetMenuId);
+          outgoingCount++;
+          incomingConnectionCount.set(
+            button.targetMenuId, 
+            (incomingConnectionCount.get(button.targetMenuId) || 0) + 1
+          );
         }
         if (button.targetActionId) {
-          hasOutgoingConnection.add(menu.id);
+          outgoingCount++;
         }
       });
+      if (outgoingCount > 0) {
+        outgoingConnectionCount.set(menu.id, outgoingCount);
+      }
+    });
+    
+    // Also count incoming from action outcomes
+    (project.actionNodes || []).forEach(actionNode => {
+      if (actionNode.outcomes) {
+        actionNode.outcomes.forEach(outcome => {
+          if (outcome.targetId && menuIdSet.has(outcome.targetId)) {
+            incomingConnectionCount.set(
+              outcome.targetId, 
+              (incomingConnectionCount.get(outcome.targetId) || 0) + 1
+            );
+          }
+        });
+      }
     });
 
     return project.menus.map((menu, index) => {
@@ -312,10 +333,13 @@ export function BuilderCanvas() {
         .filter((b) => (b.targetMenuId && menuIdSet.has(b.targetMenuId)) || b.targetActionId)
         .map((b) => b.id);
       
+      const incomingConnections = incomingConnectionCount.get(menu.id) || 0;
+      const outgoingConnections = outgoingConnectionCount.get(menu.id) || 0;
+      
       // A menu is orphan if it's not root and has no connections at all
       const isOrphan = menu.id !== project.rootMenuId && 
-        !hasOutgoingConnection.has(menu.id) && 
-        !hasIncomingConnection.has(menu.id);
+        incomingConnections === 0 && 
+        outgoingConnections === 0;
 
       return {
         id: menu.id,
@@ -329,6 +353,8 @@ export function BuilderCanvas() {
           isDragging: false,
           connectedButtonIds,
           justMovedButtonId,
+          incomingConnections,
+          outgoingConnections,
           onEdit: () => {
             setCurrentMenu(menu.id);
             setShowEditor(true);
@@ -347,34 +373,62 @@ export function BuilderCanvas() {
         },
       };
     });
-  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast]);
+  }, [project?.menus, project?.actionNodes, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast]);
 
   const actionNodes: Node<ActionNodeData>[] = useMemo(() => {
     if (!project?.actionNodes) return [];
 
-    // Build set of action IDs that have incoming connections (from buttons)
-    const connectedActionIds = new Set<string>();
+    const menuIdSet = new Set(project.menus.map((m) => m.id));
+    const actionNodeIdSet = new Set(project.actionNodes.map((an) => an.id));
+    
+    // Build connection counts for actions
+    const incomingConnectionCount = new Map<string, number>();
+    const outgoingConnectionCount = new Map<string, number>();
+    
+    // Count connections from menu buttons to actions
     project.menus.forEach(menu => {
       menu.buttons.forEach(button => {
-        if (button.targetActionId) {
-          connectedActionIds.add(button.targetActionId);
+        if (button.targetActionId && actionNodeIdSet.has(button.targetActionId)) {
+          incomingConnectionCount.set(
+            button.targetActionId, 
+            (incomingConnectionCount.get(button.targetActionId) || 0) + 1
+          );
         }
       });
     });
-    // Also check action outcomes pointing to other actions
+    
+    // Count connections between actions and from actions to menus
     project.actionNodes.forEach(actionNode => {
       if (actionNode.outcomes) {
+        let outgoingCount = 0;
         actionNode.outcomes.forEach(outcome => {
-          if (outcome.targetId && project.actionNodes.some(an => an.id === outcome.targetId)) {
-            connectedActionIds.add(outcome.targetId);
+          if (outcome.targetId) {
+            const isMenuTarget = menuIdSet.has(outcome.targetId);
+            const isActionTarget = actionNodeIdSet.has(outcome.targetId);
+            
+            if (isMenuTarget || isActionTarget) {
+              outgoingCount++;
+              if (isActionTarget) {
+                incomingConnectionCount.set(
+                  outcome.targetId, 
+                  (incomingConnectionCount.get(outcome.targetId) || 0) + 1
+                );
+              }
+            }
           }
         });
+        if (outgoingCount > 0) {
+          outgoingConnectionCount.set(actionNode.id, outgoingCount);
+        }
       }
     });
 
     return project.actionNodes.map((actionNode) => {
+      const incomingConnections = incomingConnectionCount.get(actionNode.id) || 0;
+      const outgoingConnections = outgoingConnectionCount.get(actionNode.id) || 0;
+      
       // An action is orphan if nothing points to it
-      const isOrphan = !connectedActionIds.has(actionNode.id);
+      const isOrphan = incomingConnections === 0;
 
       return {
         id: actionNode.id,
@@ -385,6 +439,8 @@ export function BuilderCanvas() {
           isSelected: actionNode.id === selectedActionNodeId,
           isDragging: false,
           isOrphan,
+          incomingConnections,
+          outgoingConnections,
           onEdit: () => {
             setSelectedActionNode(actionNode.id);
             setShowActionEditor(true);

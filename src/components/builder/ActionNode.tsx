@@ -9,6 +9,8 @@ export interface ActionNodeData extends Record<string, unknown> {
   isSelected: boolean;
   isDragging?: boolean;
   isOrphan?: boolean;
+  incomingConnections?: number;
+  outgoingConnections?: number;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -22,7 +24,7 @@ interface ActionNodeProps {
 }
 
 function ActionNodeComponent({ data, selected }: ActionNodeProps) {
-  const { actionNode, isOrphan, onEdit, onDelete, onDuplicate } = data;
+  const { actionNode, isOrphan, onEdit, onDelete, onDuplicate, incomingConnections = 0, outgoingConnections = 0 } = data;
   const isSelected = selected || data.isSelected;
 
   const actionInfo = ACTION_INFO[actionNode.type];
@@ -479,7 +481,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
           : undefined
       }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
-      className={`action-node builder-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-colors ${colorClasses} ${
+      className={`action-node builder-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-colors relative ${colorClasses} ${
         isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
       } ${isOrphan ? 'border-orange-400' : ''}`}
       style={{ 
@@ -488,6 +490,17 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
         minHeight: nodeMinHeight,
       }}
     >
+      {/* Connection count badges */}
+      {incomingConnections > 0 && (
+        <div className="node-connection-badge incoming" title={`${incomingConnections} входящих`}>
+          ←{incomingConnections}
+        </div>
+      )}
+      {outgoingConnections > 0 && (
+        <div className="node-connection-badge outgoing" title={`${outgoingConnections} исходящих`}>
+          {outgoingConnections}→
+        </div>
+      )}
       <Handle
         type="target"
         position={Position.Left}

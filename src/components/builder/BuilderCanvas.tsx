@@ -259,6 +259,7 @@ export function BuilderCanvas() {
   const [actionNodeToDelete, setActionNodeToDelete] = useState<{ id: string; name: string } | null>(null);
   const [showActionEditor, setShowActionEditor] = useState(false);
   const [currentViewport, setCurrentViewport] = useState({ x: 100, y: 100, zoom: 0.8 });
+  const [topNodeId, setTopNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (projectId) setCurrentProject(projectId);
@@ -459,7 +460,14 @@ export function BuilderCanvas() {
     });
   }, [project?.actionNodes, project?.menus, selectedActionNodeId, setSelectedActionNode, duplicateActionNode]);
 
-  const nodes = useMemo(() => [...menuNodes, ...actionNodes], [menuNodes, actionNodes]);
+  const nodes = useMemo(() => {
+    const allNodes = [...menuNodes, ...actionNodes];
+    // Apply z-index: topNodeId gets highest z-index
+    return allNodes.map(node => ({
+      ...node,
+      zIndex: node.id === topNodeId ? 1000 : undefined,
+    }));
+  }, [menuNodes, actionNodes, topNodeId]);
 
   const edges: Edge[] = useMemo(() => {
     if (!project) return [];
@@ -749,6 +757,13 @@ export function BuilderCanvas() {
     [setCurrentMenu, setSelectedActionNode]
   );
 
+  const handleNodeDragStart = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      setTopNodeId(node.id);
+    },
+    []
+  );
+
   const handleNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
       if (node.type === 'actionNode') {
@@ -1001,6 +1016,7 @@ export function BuilderCanvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
+        onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
         onEdgeClick={handleEdgeClick}
         onMove={(_, viewport) => setCurrentViewport(viewport)}

@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ActionHelpPanel } from './ActionHelpPanel';
+import { ActionConfigForms, getActionFormMeta } from './config-fields';
 
 const actionIcons: Record<string, React.ElementType> = {
   show_text: MessageSquare,
@@ -71,14 +72,31 @@ interface ActionConfiguratorProps {
 
 export function ActionConfigurator({ action, menus, onChange, onClose, onSave }: ActionConfiguratorProps) {
   const [showHelp, setShowHelp] = useState(false);
+  const [useNewForms, setUseNewForms] = useState(true);
   const Icon = actionIcons[action.type] || MessageSquare;
   const info = ACTION_INFO[action.type];
+  const formMeta = getActionFormMeta(action.type);
 
   const updateConfig = (key: string, value: any) => {
     onChange({ ...action.config, [key]: value });
   };
 
+  // Новые user-friendly формы для основных действий
+  const hasNewForm = ['show_text', 'delay', 'typing_indicator', 'navigate_menu', 'open_url', 'add_tag', 'remove_tag', 'modify_points', 'send_notification', 'broadcast', 'process_payment', 'request_input'].includes(action.type);
+
   const renderConfig = () => {
+    // Используем новые формы если доступны
+    if (useNewForms && hasNewForm) {
+      return (
+        <ActionConfigForms
+          actionType={action.type}
+          config={action.config}
+          menus={menus}
+          updateConfig={updateConfig}
+        />
+      );
+    }
+    
     switch (action.type) {
       case 'show_text':
         return (

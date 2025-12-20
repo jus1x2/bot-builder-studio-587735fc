@@ -33,7 +33,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
       return false;
     }
 
-    // Get existing menu IDs to detect which ones to delete
+    // Get existing menu IDs and button IDs to detect which ones to delete
     const { data: existingMenus } = await supabase
       .from('bot_menus')
       .select('id')
@@ -42,7 +42,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
     const existingMenuIds = new Set((existingMenus || []).map(m => m.id));
     const currentMenuIds = new Set(project.menus.map(m => m.id));
     
-    // Delete menus that no longer exist
+    // Delete menus that no longer exist (cascade will delete buttons)
     const menusToDelete = [...existingMenuIds].filter(id => !currentMenuIds.has(id));
     if (menusToDelete.length > 0) {
       await supabase.from('bot_menus').delete().in('id', menusToDelete);
@@ -51,7 +51,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
     // Delete existing action nodes and re-insert (action nodes are simpler)
     await supabase.from('bot_action_nodes').delete().eq('project_id', project.id);
 
-    // Upsert menus (insert or update)
+    // Upsert menus first (without touching buttons)
     for (const menu of project.menus) {
       const { error: menuError } = await supabase.from('bot_menus').upsert({
         id: menu.id,
@@ -62,7 +62,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
         parent_id: menu.parentId || null,
         position_x: Math.round(menu.position?.x || 0),
         position_y: Math.round(menu.position?.y || 0),
-        menu_order: menu.order || 0,
+        menu_order: typeof menu.order === 'number' ? menu.order : 0,
         keyword_triggers: menu.keywordTriggers || [],
         settings: menu.settings || {},
         media_url: menu.mediaUrl || null,
@@ -72,26 +72,42 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
         console.error('Error saving menu:', menuError);
         throw new Error(`Failed to save menu ${menu.id}: ${menuError.message}`);
       }
+    }
 
-      // Delete existing buttons for this menu and re-insert
-      await supabase.from('bot_buttons').delete().eq('menu_id', menu.id);
+    // Now handle buttons separately with upsert
+    for (const menu of project.menus) {
+      // Get existing button IDs for this menu
+      const { data: existingButtons } = await supabase
+        .from('bot_buttons')
+        .select('id')
+        .eq('menu_id', menu.id);
+      
+      const existingButtonIds = new Set((existingButtons || []).map(b => b.id));
+      const currentButtonIds = new Set(menu.buttons.map(b => b.id));
+      
+      // Delete buttons that no longer exist in this menu
+      const buttonsToDelete = [...existingButtonIds].filter(id => !currentButtonIds.has(id));
+      if (buttonsToDelete.length > 0) {
+        await supabase.from('bot_buttons').delete().in('id', buttonsToDelete);
+      }
 
-      // Save buttons for this menu
+      // Upsert buttons for this menu
       for (const button of menu.buttons) {
-        const { error: buttonError } = await supabase.from('bot_buttons').insert([{
+        const { error: buttonError } = await supabase.from('bot_buttons').upsert({
           id: button.id,
           menu_id: menu.id,
           text: button.text,
-          row_index: button.row || 0,
-          button_order: button.order || 0,
+          row_index: typeof button.row === 'number' ? button.row : 0,
+          button_order: typeof button.order === 'number' ? button.order : 0,
           target_menu_id: button.targetMenuId || null,
           target_action_id: button.targetActionId || null,
-          label_position: button.labelPosition || 0.5,
+          label_position: typeof button.labelPosition === 'number' ? button.labelPosition : 0.5,
           actions: JSON.parse(JSON.stringify(button.actions || [])),
-        }]);
+        });
 
         if (buttonError) {
           console.error('Error saving button:', buttonError);
+          throw new Error(`Failed to save button ${button.id}: ${buttonError.message}`);
         }
       }
     }

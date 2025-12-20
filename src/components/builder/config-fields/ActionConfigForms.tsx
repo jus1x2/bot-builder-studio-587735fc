@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { 
   MessageSquare, Clock, ArrowRight, Link, Edit3, Tag, GitBranch, 
   ShoppingCart, Trophy, Bell, Send, HelpCircle, Star, Package,
-  Users, Search, Timer, Target, Gift, Shield, CheckCircle, Hash
+  Users, Search, Timer, Target, Gift, Shield, CheckCircle, Hash, Trash2
 } from 'lucide-react';
 import { ActionType, BotMenu } from '@/types/bot';
 import { 
@@ -821,6 +821,649 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
               value={config.field || ''}
               onChange={(v) => updateConfig('field', v)}
               placeholder="user.name"
+            />
+          </ConfigField>
+        </div>
+      );
+
+    case 'if_else':
+      return (
+        <div className="space-y-4">
+          <ConfigField
+            label="Что проверить"
+            description="Выберите тип проверки"
+            tip="Условия позволяют показывать разный контент разным пользователям"
+          >
+            <ConfigSelect
+              value={config.conditionType || 'field'}
+              onChange={(v) => updateConfig('conditionType', v)}
+              options={CONDITION_TYPE_OPTIONS}
+            />
+          </ConfigField>
+
+          {config.conditionType === 'field' && (
+            <>
+              <ConfigField
+                label="Какие данные проверить"
+                description="Название сохранённого значения"
+                example="user.balance"
+              >
+                <ConfigTextInput
+                  value={config.field || ''}
+                  onChange={(v) => updateConfig('field', v)}
+                  placeholder="user.balance"
+                />
+              </ConfigField>
+
+              <ConfigField
+                label="Как сравнить"
+                description="Условие сравнения"
+              >
+                <ConfigSelect
+                  value={config.operator || 'equals'}
+                  onChange={(v) => updateConfig('operator', v)}
+                  options={OPERATOR_OPTIONS}
+                />
+              </ConfigField>
+
+              {config.operator !== 'exists' && (
+                <ConfigField
+                  label="С каким значением"
+                  description="Значение для сравнения"
+                  example="100"
+                >
+                  <ConfigTextInput
+                    value={config.value || ''}
+                    onChange={(v) => updateConfig('value', v)}
+                    placeholder="Введите значение"
+                  />
+                </ConfigField>
+              )}
+            </>
+          )}
+
+          {config.conditionType === 'tag' && (
+            <ConfigField
+              label="Какая метка"
+              description="Проверить наличие метки у пользователя"
+              example="VIP"
+            >
+              <ConfigTextInput
+                value={config.tag || ''}
+                onChange={(v) => updateConfig('tag', v)}
+                placeholder="VIP"
+                validate={validators.tag}
+              />
+            </ConfigField>
+          )}
+
+          {config.conditionType === 'subscription' && (
+            <ConfigField
+              label="Канал или чат"
+              description="Проверить подписку на канал"
+              example="@mychannel"
+            >
+              <ConfigTextInput
+                value={config.channel || ''}
+                onChange={(v) => updateConfig('channel', v)}
+                placeholder="@channel"
+                validate={validators.channel}
+              />
+            </ConfigField>
+          )}
+
+          {config.conditionType === 'time' && (
+            <ConfigGroup title="Временной диапазон" description="Действие сработает в это время">
+              <div className="grid grid-cols-2 gap-3">
+                <ConfigField label="С">
+                  <input
+                    type="time"
+                    value={config.timeFrom || '09:00'}
+                    onChange={(e) => updateConfig('timeFrom', e.target.value)}
+                    className="telegram-input w-full px-3 py-2 rounded-lg"
+                  />
+                </ConfigField>
+                <ConfigField label="До">
+                  <input
+                    type="time"
+                    value={config.timeTo || '18:00'}
+                    onChange={(e) => updateConfig('timeTo', e.target.value)}
+                    className="telegram-input w-full px-3 py-2 rounded-lg"
+                  />
+                </ConfigField>
+              </div>
+            </ConfigGroup>
+          )}
+
+          <ConfigGroup title="Что делать по результату" description="Куда перейти при разных исходах">
+            <ConfigField
+              label="Если ДА ✓"
+              description="Куда перейти если условие выполняется"
+            >
+              <ConfigSelect
+                value={config.trueMenuId || ''}
+                onChange={(v) => updateConfig('trueMenuId', v)}
+                options={[{ value: '', label: 'Продолжить дальше', description: 'Следующее действие' }, ...menuOptions]}
+                placeholder="Выберите экран..."
+              />
+            </ConfigField>
+
+            <ConfigField
+              label="Если НЕТ ✗"
+              description="Куда перейти если условие НЕ выполняется"
+            >
+              <ConfigSelect
+                value={config.falseMenuId || ''}
+                onChange={(v) => updateConfig('falseMenuId', v)}
+                options={[{ value: '', label: 'Продолжить дальше', description: 'Следующее действие' }, ...menuOptions]}
+                placeholder="Выберите экран..."
+              />
+            </ConfigField>
+          </ConfigGroup>
+        </div>
+      );
+
+    case 'wait_response':
+      return (
+        <div className="space-y-4">
+          <ConfigField
+            label="Сколько ждать ответ"
+            description="Максимальное время ожидания"
+            tip="0 = ждать бесконечно. Для опросов рекомендуем 60-300 секунд"
+          >
+            <ConfigNumber
+              value={config.timeout || 60}
+              onChange={(v) => updateConfig('timeout', v)}
+              min={0}
+              max={3600}
+              unit="сек"
+              presets={[
+                { value: 0, label: 'Бесконечно' },
+                { value: 60, label: '1 мин' },
+                { value: 300, label: '5 мин' },
+                { value: 3600, label: '1 час' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Куда сохранить ответ"
+            description="Бот запомнит ответ под этим именем"
+            example="user.answer"
+            tip="Потом можно использовать это значение в сообщениях через {user.answer}"
+          >
+            <ConfigTextInput
+              value={config.saveToField || ''}
+              onChange={(v) => updateConfig('saveToField', v)}
+              placeholder="user.answer"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Если не ответил вовремя"
+            description="Что делать когда время вышло"
+          >
+            <ConfigSelect
+              value={config.timeoutAction || 'none'}
+              onChange={(v) => updateConfig('timeoutAction', v)}
+              options={TIMEOUT_ACTION_OPTIONS}
+            />
+          </ConfigField>
+
+          {config.timeoutAction === 'menu' && (
+            <ConfigField
+              label="Перейти к экрану"
+              description="Какой экран показать при истечении времени"
+            >
+              <ConfigSelect
+                value={config.timeoutMenuId || ''}
+                onChange={(v) => updateConfig('timeoutMenuId', v)}
+                options={menuOptions}
+                placeholder="Выберите экран..."
+              />
+            </ConfigField>
+          )}
+
+          <ConfigInfo type="tip">
+            Ждать ответ полезно для опросов, сбора контактов и обратной связи.
+          </ConfigInfo>
+        </div>
+      );
+
+    case 'quiz':
+      return (
+        <div className="space-y-4">
+          <ConfigField
+            label="Вопрос"
+            description="Что спросить у пользователя"
+            required
+          >
+            <ConfigTextInput
+              value={config.question || ''}
+              onChange={(v) => updateConfig('question', v)}
+              placeholder="Какой город является столицей России?"
+              multiline
+              rows={2}
+            />
+          </ConfigField>
+
+          <ConfigGroup title="Варианты ответов" description="Добавьте 2-4 варианта">
+            {[0, 1, 2, 3].map((i) => (
+              <ConfigField key={i} label={`Вариант ${i + 1}`}>
+                <div className="flex gap-2">
+                  <ConfigTextInput
+                    value={config.options?.[i] || ''}
+                    onChange={(v) => {
+                      const opts = [...(config.options || ['', '', '', ''])];
+                      opts[i] = v;
+                      updateConfig('options', opts);
+                    }}
+                    placeholder={i === 0 ? 'Москва' : i === 1 ? 'Санкт-Петербург' : ''}
+                  />
+                  <ConfigToggle
+                    checked={config.correctIndex === i}
+                    onChange={() => updateConfig('correctIndex', i)}
+                    label="✓"
+                    icon={<CheckCircle className="w-4 h-4" />}
+                  />
+                </div>
+              </ConfigField>
+            ))}
+          </ConfigGroup>
+
+          <ConfigField
+            label="Сообщение при правильном ответе"
+            description="Что показать когда ответ верный"
+          >
+            <ConfigTextInput
+              value={config.correctMessage || ''}
+              onChange={(v) => updateConfig('correctMessage', v)}
+              placeholder="🎉 Верно! Молодец!"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Сообщение при неправильном ответе"
+            description="Что показать когда ответ неверный"
+          >
+            <ConfigTextInput
+              value={config.wrongMessage || ''}
+              onChange={(v) => updateConfig('wrongMessage', v)}
+              placeholder="❌ Неверно. Правильный ответ: Москва"
+            />
+          </ConfigField>
+
+          <ConfigToggle
+            checked={config.addPoints || false}
+            onChange={(v) => updateConfig('addPoints', v)}
+            label="Начислять баллы за правильный ответ"
+            description="Добавить баллы пользователю"
+            icon={<Star className="w-4 h-4" />}
+          />
+
+          {config.addPoints && (
+            <ConfigField label="Сколько баллов">
+              <ConfigNumber
+                value={config.pointsAmount || 10}
+                onChange={(v) => updateConfig('pointsAmount', v)}
+                min={1}
+                max={1000}
+                presets={[
+                  { value: 5, label: '+5' },
+                  { value: 10, label: '+10' },
+                  { value: 25, label: '+25' },
+                ]}
+              />
+            </ConfigField>
+          )}
+        </div>
+      );
+
+    case 'random_result':
+      const outcomeCount = config.outcomeCount || 2;
+      return (
+        <div className="space-y-4">
+          <ConfigField
+            label="Сколько вариантов"
+            description="Бот случайно выберет один из них"
+            tip="Используйте для розыгрышей, игр, случайных рекомендаций"
+          >
+            <ConfigNumber
+              value={outcomeCount}
+              onChange={(v) => updateConfig('outcomeCount', Math.max(2, Math.min(10, v)))}
+              min={2}
+              max={10}
+              presets={[
+                { value: 2, label: '2 варианта' },
+                { value: 3, label: '3 варианта' },
+                { value: 4, label: '4 варианта' },
+                { value: 5, label: '5 вариантов' },
+              ]}
+            />
+          </ConfigField>
+
+          <div className="p-4 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-200/50 dark:border-purple-800/30">
+            <p className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-3">
+              🎲 Шансы выпадения:
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {Array.from({ length: outcomeCount }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/50 dark:bg-black/20">
+                  <span className="text-sm text-purple-600 dark:text-purple-400">
+                    Исход {i + 1}
+                  </span>
+                  <span className="text-sm font-bold text-purple-700 dark:text-purple-300">
+                    {Math.round(100 / outcomeCount)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-purple-500 dark:text-purple-400 mt-3">
+              💡 Соедините каждый выход с нужным экраном на канвасе
+            </p>
+          </div>
+
+          <ConfigField
+            label="Сохранить результат"
+            description="Куда записать номер выбранного варианта"
+            example="user.luck_result"
+          >
+            <ConfigTextInput
+              value={config.saveToField || ''}
+              onChange={(v) => updateConfig('saveToField', v)}
+              placeholder="user.random_result"
+            />
+          </ConfigField>
+        </div>
+      );
+
+    // Магазин
+    case 'add_to_cart':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="info">
+            Добавит товар в корзину покупателя. Покупатель сможет посмотреть корзину и оплатить.
+          </ConfigInfo>
+
+          <ConfigField
+            label="ID товара"
+            description="Уникальный код товара в вашей системе"
+            example="product_001"
+            required
+          >
+            <ConfigTextInput
+              value={config.productId || ''}
+              onChange={(v) => updateConfig('productId', v)}
+              placeholder="product_001"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Название товара"
+            description="Как товар будет отображаться в корзине"
+            required
+          >
+            <ConfigTextInput
+              value={config.name || ''}
+              onChange={(v) => updateConfig('name', v)}
+              placeholder="Футболка с логотипом"
+            />
+          </ConfigField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <ConfigField label="Цена" required>
+              <ConfigNumber
+                value={config.price || 0}
+                onChange={(v) => updateConfig('price', v)}
+                min={0}
+                max={1000000}
+              />
+            </ConfigField>
+            <ConfigField label="Валюта">
+              <ConfigSelect
+                value={config.currency || '₽'}
+                onChange={(v) => updateConfig('currency', v)}
+                options={CURRENCY_OPTIONS}
+              />
+            </ConfigField>
+          </div>
+
+          <ConfigField label="Количество">
+            <ConfigNumber
+              value={config.quantity || 1}
+              onChange={(v) => updateConfig('quantity', v)}
+              min={1}
+              max={100}
+              presets={[
+                { value: 1, label: '1 шт' },
+                { value: 2, label: '2 шт' },
+                { value: 5, label: '5 шт' },
+              ]}
+            />
+          </ConfigField>
+        </div>
+      );
+
+    case 'show_product':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="info">
+            Покажет карточку товара с фото, описанием и ценой. Можно добавить кнопку «В корзину».
+          </ConfigInfo>
+
+          <ConfigField
+            label="ID товара"
+            description="Уникальный код товара"
+            example="product_001"
+            required
+          >
+            <ConfigTextInput
+              value={config.productId || ''}
+              onChange={(v) => updateConfig('productId', v)}
+              placeholder="product_001"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Название"
+            description="Заголовок карточки товара"
+            required
+          >
+            <ConfigTextInput
+              value={config.name || ''}
+              onChange={(v) => updateConfig('name', v)}
+              placeholder="Стильная футболка"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Описание"
+            description="Подробности о товаре"
+          >
+            <ConfigTextInput
+              value={config.description || ''}
+              onChange={(v) => updateConfig('description', v)}
+              placeholder="100% хлопок, размеры S-XXL"
+              multiline
+              rows={3}
+            />
+          </ConfigField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <ConfigField label="Цена" required>
+              <ConfigNumber
+                value={config.price || 0}
+                onChange={(v) => updateConfig('price', v)}
+                min={0}
+                max={1000000}
+              />
+            </ConfigField>
+            <ConfigField label="Валюта">
+              <ConfigSelect
+                value={config.currency || '₽'}
+                onChange={(v) => updateConfig('currency', v)}
+                options={CURRENCY_OPTIONS}
+              />
+            </ConfigField>
+          </div>
+
+          <ConfigField
+            label="Ссылка на фото"
+            description="URL изображения товара"
+          >
+            <ConfigTextInput
+              value={config.imageUrl || ''}
+              onChange={(v) => updateConfig('imageUrl', v)}
+              placeholder="https://example.com/photo.jpg"
+              validate={validators.url}
+            />
+          </ConfigField>
+
+          <ConfigToggle
+            checked={config.showAddButton !== false}
+            onChange={(v) => updateConfig('showAddButton', v)}
+            label="Показать кнопку «В корзину»"
+            description="Пользователь сможет добавить товар"
+            icon={<ShoppingCart className="w-4 h-4" />}
+          />
+        </div>
+      );
+
+    case 'show_cart':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="info">
+            Покажет содержимое корзины: список товаров, количество и общую сумму.
+          </ConfigInfo>
+
+          <ConfigField
+            label="Формат отображения"
+            description="Как показать содержимое корзины"
+          >
+            <ConfigSelect
+              value={config.format || 'detailed'}
+              onChange={(v) => updateConfig('format', v)}
+              options={[
+                { value: 'detailed', label: 'Подробный', description: 'Все товары с описанием' },
+                { value: 'compact', label: 'Компактный', description: 'Только названия и цены' },
+                { value: 'summary', label: 'Только итого', description: 'Количество и сумма' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigToggle
+            checked={config.showPayButton !== false}
+            onChange={(v) => updateConfig('showPayButton', v)}
+            label="Показать кнопку оплаты"
+            description="Перейти к оформлению заказа"
+            icon={<ShoppingCart className="w-4 h-4" />}
+          />
+
+          <ConfigToggle
+            checked={config.showClearButton || false}
+            onChange={(v) => updateConfig('showClearButton', v)}
+            label="Показать кнопку очистки"
+            description="Удалить все товары из корзины"
+            icon={<Trash2 className="w-4 h-4" />}
+          />
+        </div>
+      );
+
+    case 'clear_cart':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="warning">
+            Это действие удалит все товары из корзины покупателя.
+          </ConfigInfo>
+
+          <ConfigToggle
+            checked={config.confirm || false}
+            onChange={(v) => updateConfig('confirm', v)}
+            label="Запросить подтверждение"
+            description="Спросить пользователя перед очисткой"
+            icon={<HelpCircle className="w-4 h-4" />}
+          />
+
+          {config.confirm && (
+            <ConfigField
+              label="Текст подтверждения"
+              description="Что спросить перед очисткой"
+            >
+              <ConfigTextInput
+                value={config.confirmText || ''}
+                onChange={(v) => updateConfig('confirmText', v)}
+                placeholder="Вы уверены, что хотите очистить корзину?"
+              />
+            </ConfigField>
+          )}
+        </div>
+      );
+
+    case 'apply_promo':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="info">
+            Применит промокод к заказу и уменьшит сумму.
+          </ConfigInfo>
+
+          <ConfigField
+            label="Промокод"
+            description="Код, который вводит покупатель"
+            example="SALE20"
+            required
+          >
+            <ConfigTextInput
+              value={config.code || ''}
+              onChange={(v) => updateConfig('code', v.toUpperCase())}
+              placeholder="SALE20"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Тип скидки"
+            description="Как считать скидку"
+          >
+            <ConfigSelect
+              value={config.discountType || 'percent'}
+              onChange={(v) => updateConfig('discountType', v)}
+              options={[
+                { value: 'percent', label: 'Процент от суммы', description: 'Например, -20%' },
+                { value: 'fixed', label: 'Фиксированная сумма', description: 'Например, -500₽' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigField
+            label={config.discountType === 'percent' ? 'Процент скидки' : 'Сумма скидки'}
+            description={config.discountType === 'percent' ? 'От 1 до 100%' : 'В рублях'}
+          >
+            <ConfigNumber
+              value={config.discountValue || 10}
+              onChange={(v) => updateConfig('discountValue', v)}
+              min={1}
+              max={config.discountType === 'percent' ? 100 : 100000}
+              unit={config.discountType === 'percent' ? '%' : '₽'}
+              presets={config.discountType === 'percent' 
+                ? [{ value: 5, label: '5%' }, { value: 10, label: '10%' }, { value: 20, label: '20%' }, { value: 50, label: '50%' }]
+                : [{ value: 100, label: '100₽' }, { value: 500, label: '500₽' }, { value: 1000, label: '1000₽' }]
+              }
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Лимит использований"
+            description="Сколько раз можно применить (0 = без ограничений)"
+          >
+            <ConfigNumber
+              value={config.maxUses || 0}
+              onChange={(v) => updateConfig('maxUses', v)}
+              min={0}
+              max={10000}
+              presets={[
+                { value: 0, label: 'Без лимита' },
+                { value: 10, label: '10 раз' },
+                { value: 100, label: '100 раз' },
+              ]}
             />
           </ConfigField>
         </div>

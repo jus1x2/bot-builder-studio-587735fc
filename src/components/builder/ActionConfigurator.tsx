@@ -82,7 +82,7 @@ export function ActionConfigurator({ action, menus, onChange, onClose, onSave }:
   };
 
   // Новые user-friendly формы для основных действий
-  const hasNewForm = ['show_text', 'delay', 'typing_indicator', 'navigate_menu', 'open_url', 'add_tag', 'remove_tag', 'modify_points', 'send_notification', 'broadcast', 'process_payment', 'request_input'].includes(action.type);
+  const hasNewForm = ['show_text', 'delay', 'typing_indicator', 'navigate_menu', 'open_url', 'add_tag', 'remove_tag', 'modify_points', 'send_notification', 'broadcast', 'process_payment', 'request_input', 'if_else', 'wait_response', 'quiz', 'random_result', 'add_to_cart', 'show_product', 'show_cart', 'clear_cart', 'apply_promo'].includes(action.type);
 
   const renderConfig = () => {
     // Используем новые формы если доступны

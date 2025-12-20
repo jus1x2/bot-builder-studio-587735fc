@@ -259,10 +259,6 @@ export function BuilderCanvas() {
   const [actionNodeToDelete, setActionNodeToDelete] = useState<{ id: string; name: string } | null>(null);
   const [showActionEditor, setShowActionEditor] = useState(false);
   const [currentViewport, setCurrentViewport] = useState({ x: 100, y: 100, zoom: 0.8 });
-  const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
-  // Track z-index order: nodes get increasing zIndex as they are interacted with
-  const zIndexOrderRef = useRef<Map<string, number>>(new Map());
-  const zIndexCounterRef = useRef(1);
 
   useEffect(() => {
     if (projectId) setCurrentProject(projectId);
@@ -323,15 +319,14 @@ export function BuilderCanvas() {
 
       return {
         id: menu.id,
-        type: 'menuNode',
+        type: 'menuNode' as const,
         position: menu.position || { x: index * 300, y: index * 100 },
-        zIndex: draggedNodeId === menu.id ? 1000 : (zIndexOrderRef.current.get(menu.id) || 1),
         data: {
           menu,
           isSelected: menu.id === currentMenuId,
           isRoot: menu.id === project.rootMenuId,
           isOrphan,
-          isDragging: draggedNodeId === menu.id,
+          isDragging: false,
           connectedButtonIds,
           justMovedButtonId,
           onEdit: () => {
@@ -352,7 +347,7 @@ export function BuilderCanvas() {
         },
       };
     });
-  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast, draggedNodeId]);
+  }, [project?.menus, project?.rootMenuId, currentMenuId, justMovedButtonId, setCurrentMenu, duplicateMenu, toast]);
 
   const actionNodes: Node<ActionNodeData>[] = useMemo(() => {
     if (!project?.actionNodes) return [];
@@ -383,13 +378,12 @@ export function BuilderCanvas() {
 
       return {
         id: actionNode.id,
-        type: 'actionNode',
+        type: 'actionNode' as const,
         position: actionNode.position,
-        zIndex: draggedNodeId === actionNode.id ? 1000 : (zIndexOrderRef.current.get(actionNode.id) || 1),
         data: {
           actionNode,
           isSelected: actionNode.id === selectedActionNodeId,
-          isDragging: draggedNodeId === actionNode.id,
+          isDragging: false,
           isOrphan,
           onEdit: () => {
             setSelectedActionNode(actionNode.id);
@@ -407,7 +401,7 @@ export function BuilderCanvas() {
         },
       };
     });
-  }, [project?.actionNodes, project?.menus, selectedActionNodeId, setSelectedActionNode, duplicateActionNode, draggedNodeId]);
+  }, [project?.actionNodes, project?.menus, selectedActionNodeId, setSelectedActionNode, duplicateActionNode]);
 
   const nodes = useMemo(() => [...menuNodes, ...actionNodes], [menuNodes, actionNodes]);
 
@@ -699,20 +693,8 @@ export function BuilderCanvas() {
     [setCurrentMenu, setSelectedActionNode]
   );
 
-  const handleNodeDragStart = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      setDraggedNodeId(node.id);
-      // Increment z-index counter and assign to this node
-      zIndexCounterRef.current += 1;
-      zIndexOrderRef.current.set(node.id, zIndexCounterRef.current);
-    },
-    []
-  );
-
   const handleNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      setDraggedNodeId(null);
-      // Keep lastInteractedNodeId so the node stays on top
       if (node.type === 'actionNode') {
         updateActionNode(node.id, { position: node.position });
       } else {
@@ -963,7 +945,6 @@ export function BuilderCanvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
-        onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
         onEdgeClick={handleEdgeClick}
         onMove={(_, viewport) => setCurrentViewport(viewport)}

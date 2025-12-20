@@ -12,6 +12,8 @@ export interface MenuNodeData extends Record<string, unknown> {
   isDragging?: boolean;
   connectedButtonIds?: string[];
   justMovedButtonId?: string | null;
+  incomingConnections?: number;
+  outgoingConnections?: number;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -25,7 +27,7 @@ interface MenuNodeProps {
 }
 
 function MenuNodeComponent({ data, selected }: MenuNodeProps) {
-  const { menu, isRoot, isOrphan, onEdit, onDelete, onDuplicate, justMovedButtonId } = data;
+  const { menu, isRoot, isOrphan, onEdit, onDelete, onDuplicate, justMovedButtonId, incomingConnections = 0, outgoingConnections = 0 } = data;
   const isSelected = selected || data.isSelected;
 
   const buttonRows = useMemo(() => {
@@ -80,9 +82,20 @@ function MenuNodeComponent({ data, selected }: MenuNodeProps) {
               : undefined
           }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className={`builder-node node-optimized ${isSelected ? 'selected' : ''} ${isOrphan ? 'orphan-node' : ''}`}
+          className={`builder-node node-optimized ${isSelected ? 'selected' : ''} ${isOrphan ? 'orphan-node' : ''} relative`}
           style={{ minWidth: 220, maxWidth: 280 }}
         >
+          {/* Connection count badges */}
+          {incomingConnections > 0 && !isRoot && (
+            <div className="node-connection-badge incoming" title={`${incomingConnections} входящих`}>
+              ←{incomingConnections}
+            </div>
+          )}
+          {outgoingConnections > 0 && (
+            <div className="node-connection-badge outgoing" title={`${outgoingConnections} исходящих`}>
+              {outgoingConnections}→
+            </div>
+          )}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${

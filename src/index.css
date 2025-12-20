@@ -353,6 +353,21 @@ html, body {
   transition: z-index 0.15s ease-out, transform 0.1s ease-out, filter 0.15s ease-out;
 }
 
+/* Node hover state - subtle glow and lift */
+.react-flow__node:not(.dragging):hover .builder-node {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px -5px rgba(0, 0, 0, 0.15),
+    0 0 20px -5px hsl(var(--primary) / 0.2);
+}
+
+.react-flow__node:not(.dragging):hover .action-node {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px -5px rgba(0, 0, 0, 0.15),
+    0 0 20px -5px hsl(var(--primary) / 0.2);
+}
+
 /* Node dragging state - React Flow adds .dragging class automatically */
 .react-flow__node.dragging {
   z-index: 1000 !important;
@@ -366,6 +381,25 @@ html, body {
 
 .react-flow__node.selected {
   z-index: 100;
+}
+
+/* Connection count badge */
+.node-connection-badge {
+  @apply absolute -top-2 -right-2 min-w-5 h-5 px-1 text-[10px] font-semibold rounded-full flex items-center justify-center shadow-md transition-all;
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8));
+  color: hsl(var(--primary-foreground));
+  border: 2px solid hsl(var(--card));
+}
+
+.node-connection-badge.incoming {
+  @apply -top-2 -left-2;
+  right: auto;
+  background: linear-gradient(135deg, hsl(var(--telegram-green)), hsl(var(--telegram-green) / 0.8));
+}
+
+.node-connection-badge.outgoing {
+  @apply -top-2 -right-2;
+  background: linear-gradient(135deg, hsl(var(--telegram-blue)), hsl(var(--telegram-blue) / 0.8));
 }
 
 .react-flow__edge-path {

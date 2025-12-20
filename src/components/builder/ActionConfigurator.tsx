@@ -81,8 +81,27 @@ export function ActionConfigurator({ action, menus, onChange, onClose, onSave }:
     onChange({ ...action.config, [key]: value });
   };
 
-  // Новые user-friendly формы для основных действий
-  const hasNewForm = ['show_text', 'delay', 'typing_indicator', 'navigate_menu', 'open_url', 'add_tag', 'remove_tag', 'modify_points', 'send_notification', 'broadcast', 'process_payment', 'request_input', 'if_else', 'wait_response', 'quiz', 'random_result', 'add_to_cart', 'show_product', 'show_cart', 'clear_cart', 'apply_promo'].includes(action.type);
+  // Новые user-friendly формы для всех действий
+  const hasNewForm = [
+    // Базовые
+    'show_text', 'delay', 'typing_indicator', 'navigate_menu', 'open_url',
+    // Данные
+    'set_field', 'change_field', 'append_to_list', 'clear_field', 'add_tag', 'remove_tag',
+    // Логика
+    'if_else', 'check_subscription', 'check_role', 'check_value', 'wait_response', 
+    'keyword_trigger', 'no_response', 'wrong_response',
+    // Магазин
+    'add_to_cart', 'update_quantity', 'show_product', 'remove_from_cart', 
+    'check_stock', 'apply_promo', 'show_cart', 'clear_cart', 'process_payment',
+    // Геймификация
+    'random_result', 'weighted_random', 'lottery', 'leaderboard', 'modify_points', 'spam_protection',
+    // Интерактив
+    'request_input', 'quiz',
+    // События
+    'on_payment_success', 'on_first_visit', 'on_timer', 'on_threshold',
+    // Автоматизация
+    'send_notification', 'schedule_message', 'broadcast'
+  ].includes(action.type);
 
   const renderConfig = () => {
     // Используем новые формы если доступны

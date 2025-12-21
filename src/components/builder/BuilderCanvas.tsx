@@ -291,6 +291,7 @@ export function BuilderCanvas() {
     if (!project) return [];
 
     const menuIdSet = new Set(project.menus.map((m) => m.id));
+    const actionNodeIdSet = new Set((project.actionNodes || []).map((an) => an.id));
     
     // Calculate connection counts for each menu
     const incomingConnectionCount = new Map<string, number>();
@@ -299,6 +300,7 @@ export function BuilderCanvas() {
     project.menus.forEach(menu => {
       let outgoingCount = 0;
       menu.buttons.forEach(button => {
+        // Count connections to other menus
         if (button.targetMenuId && menuIdSet.has(button.targetMenuId)) {
           outgoingCount++;
           incomingConnectionCount.set(
@@ -306,7 +308,8 @@ export function BuilderCanvas() {
             (incomingConnectionCount.get(button.targetMenuId) || 0) + 1
           );
         }
-        if (button.targetActionId) {
+        // Count connections to action nodes
+        if (button.targetActionId && actionNodeIdSet.has(button.targetActionId)) {
           outgoingCount++;
         }
       });
@@ -315,8 +318,9 @@ export function BuilderCanvas() {
       }
     });
     
-    // Also count incoming from action outcomes
+    // Count incoming from action node outcomes (when action points to menu)
     (project.actionNodes || []).forEach(actionNode => {
+      // Check multi-output actions (outcomes)
       if (actionNode.outcomes) {
         actionNode.outcomes.forEach(outcome => {
           if (outcome.targetId && menuIdSet.has(outcome.targetId)) {
@@ -327,17 +331,27 @@ export function BuilderCanvas() {
           }
         });
       }
+      // Check single-output actions (nextNodeId)
+      if (actionNode.nextNodeId && actionNode.nextNodeType === 'menu' && menuIdSet.has(actionNode.nextNodeId)) {
+        incomingConnectionCount.set(
+          actionNode.nextNodeId, 
+          (incomingConnectionCount.get(actionNode.nextNodeId) || 0) + 1
+        );
+      }
     });
 
     return project.menus.map((menu, index) => {
       const connectedButtonIds = menu.buttons
-        .filter((b) => (b.targetMenuId && menuIdSet.has(b.targetMenuId)) || b.targetActionId)
+        .filter((b) => (b.targetMenuId && menuIdSet.has(b.targetMenuId)) || (b.targetActionId && actionNodeIdSet.has(b.targetActionId)))
         .map((b) => b.id);
       
       const incomingConnections = incomingConnectionCount.get(menu.id) || 0;
       const outgoingConnections = outgoingConnectionCount.get(menu.id) || 0;
       
-      // A menu is orphan if it's not root and has no connections at all
+      // A menu is orphan ONLY if:
+      // 1. It's not the root menu
+      // 2. It has NO incoming connections (nothing points to it)
+      // 3. It has NO outgoing connections (it doesn't point to anything)
       const isOrphan = menu.id !== project.rootMenuId && 
         incomingConnections === 0 && 
         outgoingConnections === 0;

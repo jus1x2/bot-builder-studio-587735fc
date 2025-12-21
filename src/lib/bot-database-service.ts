@@ -2,7 +2,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { BotProject, BotMenu, BotButton, BotActionNode } from '@/types/bot';
 
 // Save project to database
+// Track ongoing saves to prevent race conditions
+const saveLocks = new Map<string, boolean>();
+
 export async function saveProjectToDatabase(project: BotProject, profileId: string): Promise<boolean> {
+  // Prevent concurrent saves for the same project
+  if (saveLocks.get(project.id)) {
+    console.log('Save already in progress for project:', project.id);
+    return false;
+  }
+  
+  saveLocks.set(project.id, true);
+  
   try {
     console.log('Saving project to database:', project.id, 'for profile:', profileId);
 
@@ -10,6 +21,13 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
     if (!project.menus || project.menus.length === 0) {
       console.warn('Refusing to save project with no menus - possible corrupted state');
       return false;
+    }
+
+    // Safety check: ensure rootMenuId exists in menus
+    const rootMenuExists = project.menus.some(m => m.id === project.rootMenuId);
+    if (!rootMenuExists && project.menus.length > 0) {
+      console.warn('Root menu not found in menus, using first menu');
+      project.rootMenuId = project.menus[0].id;
     }
 
     // Upsert project
@@ -33,7 +51,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
       return false;
     }
 
-    // Get existing menu IDs and button IDs to detect which ones to delete
+    // Get existing menu IDs to detect which ones to delete
     const { data: existingMenus } = await supabase
       .from('bot_menus')
       .select('id')
@@ -42,9 +60,11 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
     const existingMenuIds = new Set((existingMenus || []).map(m => m.id));
     const currentMenuIds = new Set(project.menus.map(m => m.id));
     
-    // Delete menus that no longer exist (cascade will delete buttons)
+    // Only delete menus that exist in DB but not in current project state
+    // This prevents accidental deletion during race conditions
     const menusToDelete = [...existingMenuIds].filter(id => !currentMenuIds.has(id));
     if (menusToDelete.length > 0) {
+      console.log('Deleting removed menus:', menusToDelete);
       await supabase.from('bot_menus').delete().in('id', menusToDelete);
     }
 
@@ -143,6 +163,8 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
   } catch (error) {
     console.error('Error saving project to database:', error);
     return false;
+  } finally {
+    saveLocks.delete(project.id);
   }
 }
 

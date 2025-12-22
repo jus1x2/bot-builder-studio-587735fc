@@ -259,7 +259,8 @@ export function BuilderCanvas() {
   const [actionNodeToDelete, setActionNodeToDelete] = useState<{ id: string; name: string } | null>(null);
   const [showActionEditor, setShowActionEditor] = useState(false);
   const [currentViewport, setCurrentViewport] = useState({ x: 100, y: 100, zoom: 0.8 });
-  const [topNodeId, setTopNodeId] = useState<string | null>(null);
+  const [nodeZIndexMap, setNodeZIndexMap] = useState<Map<string, number>>(new Map());
+  const zIndexCounterRef = useRef(1);
 
   useEffect(() => {
     if (projectId) setCurrentProject(projectId);
@@ -331,8 +332,8 @@ export function BuilderCanvas() {
           }
         });
       }
-      // Check single-output actions (nextNodeId)
-      if (actionNode.nextNodeId && actionNode.nextNodeType === 'menu' && menuIdSet.has(actionNode.nextNodeId)) {
+      // Check single-output actions (nextNodeId) - check if target is a menu by ID
+      if (actionNode.nextNodeId && menuIdSet.has(actionNode.nextNodeId)) {
         incomingConnectionCount.set(
           actionNode.nextNodeId, 
           (incomingConnectionCount.get(actionNode.nextNodeId) || 0) + 1
@@ -474,14 +475,24 @@ export function BuilderCanvas() {
     });
   }, [project?.actionNodes, project?.menus, selectedActionNodeId, setSelectedActionNode, duplicateActionNode]);
 
+  // Helper to bring node to top
+  const bringNodeToTop = useCallback((nodeId: string) => {
+    setNodeZIndexMap(prev => {
+      const newMap = new Map(prev);
+      zIndexCounterRef.current += 1;
+      newMap.set(nodeId, zIndexCounterRef.current);
+      return newMap;
+    });
+  }, []);
+
   const nodes = useMemo(() => {
     const allNodes = [...menuNodes, ...actionNodes];
-    // Apply z-index: topNodeId gets highest z-index
+    // Apply z-index from map - each node keeps its own z-index
     return allNodes.map(node => ({
       ...node,
-      zIndex: node.id === topNodeId ? 1000 : undefined,
+      zIndex: nodeZIndexMap.get(node.id) || 0,
     }));
-  }, [menuNodes, actionNodes, topNodeId]);
+  }, [menuNodes, actionNodes, nodeZIndexMap]);
 
   const edges: Edge[] = useMemo(() => {
     if (!project) return [];
@@ -759,8 +770,8 @@ export function BuilderCanvas() {
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      // Set this node as topmost
-      setTopNodeId(node.id);
+      // Bring this node to top layer
+      bringNodeToTop(node.id);
       
       const isActionNode = node.type === 'actionNode';
       if (isActionNode) {
@@ -771,14 +782,14 @@ export function BuilderCanvas() {
         setSelectedActionNode(null);
       }
     },
-    [setCurrentMenu, setSelectedActionNode]
+    [setCurrentMenu, setSelectedActionNode, bringNodeToTop]
   );
 
   const handleNodeDragStart = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      setTopNodeId(node.id);
+      bringNodeToTop(node.id);
     },
-    []
+    [bringNodeToTop]
   );
 
   const handleNodeDragStop = useCallback(

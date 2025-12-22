@@ -68,8 +68,21 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
       await supabase.from('bot_menus').delete().in('id', menusToDelete);
     }
 
-    // Delete existing action nodes and re-insert (action nodes are simpler)
-    await supabase.from('bot_action_nodes').delete().eq('project_id', project.id);
+    // Get existing action node IDs to detect which ones to delete
+    const { data: existingActionNodes } = await supabase
+      .from('bot_action_nodes')
+      .select('id')
+      .eq('project_id', project.id);
+    
+    const existingActionNodeIds = new Set((existingActionNodes || []).map(an => an.id));
+    const currentActionNodeIds = new Set((project.actionNodes || []).map(an => an.id));
+    
+    // Only delete action nodes that exist in DB but not in current project state
+    const actionNodesToDelete = [...existingActionNodeIds].filter(id => !currentActionNodeIds.has(id));
+    if (actionNodesToDelete.length > 0) {
+      console.log('Deleting removed action nodes:', actionNodesToDelete);
+      await supabase.from('bot_action_nodes').delete().in('id', actionNodesToDelete);
+    }
 
     // Upsert menus first (without touching buttons)
     for (const menu of project.menus) {
@@ -141,7 +154,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
         _outcomes: actionNode.outcomes || [],
       };
       
-      const { error: actionError } = await supabase.from('bot_action_nodes').insert([{
+      const { error: actionError } = await supabase.from('bot_action_nodes').upsert({
         id: actionNode.id,
         project_id: project.id,
         action_type: actionNode.type,
@@ -150,7 +163,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
         position_y: Math.round(actionNode.position?.y || 0),
         next_node_id: actionNode.nextNodeId || null,
         next_node_type: actionNode.nextNodeType || null,
-      }]);
+      });
 
       if (actionError) {
         console.error('Error saving action node:', actionError);

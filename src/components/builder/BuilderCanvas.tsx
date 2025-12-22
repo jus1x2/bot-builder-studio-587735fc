@@ -759,6 +759,9 @@ export function BuilderCanvas() {
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      // Set this node as topmost
+      setTopNodeId(node.id);
+      
       const isActionNode = node.type === 'actionNode';
       if (isActionNode) {
         setSelectedActionNode(node.id);

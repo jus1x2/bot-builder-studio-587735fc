@@ -415,6 +415,7 @@ export function BuilderCanvas() {
     
     // Count connections between actions and from actions to menus
     project.actionNodes.forEach(actionNode => {
+      // Count connections via outcomes (for multi-output actions)
       if (actionNode.outcomes) {
         let outgoingCount = 0;
         actionNode.outcomes.forEach(outcome => {
@@ -435,6 +436,24 @@ export function BuilderCanvas() {
         });
         if (outgoingCount > 0) {
           outgoingConnectionCount.set(actionNode.id, outgoingCount);
+        }
+      }
+      
+      // Count connections via nextNodeId (for single-output actions)
+      if (actionNode.nextNodeId) {
+        const isActionTarget = actionNodeIdSet.has(actionNode.nextNodeId);
+        if (isActionTarget) {
+          incomingConnectionCount.set(
+            actionNode.nextNodeId, 
+            (incomingConnectionCount.get(actionNode.nextNodeId) || 0) + 1
+          );
+        }
+        // Also count as outgoing connection
+        if (isActionTarget || menuIdSet.has(actionNode.nextNodeId)) {
+          outgoingConnectionCount.set(
+            actionNode.id, 
+            (outgoingConnectionCount.get(actionNode.id) || 0) + 1
+          );
         }
       }
     });

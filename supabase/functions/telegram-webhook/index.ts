@@ -98,15 +98,38 @@ serve(async (req) => {
     const pathParts = url.pathname.split('/');
     const projectId = pathParts[pathParts.length - 1];
 
-    if (!projectId || projectId === 'telegram-webhook') {
-      return new Response(JSON.stringify({ error: 'Project ID required' }), {
+    // Validate projectId format (UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!projectId || projectId === 'telegram-webhook' || !uuidRegex.test(projectId)) {
+      console.error('Invalid project ID format:', projectId);
+      return new Response(JSON.stringify({ error: 'Invalid project ID' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const update: TelegramUpdate = await req.json();
-    console.log('Received Telegram update for project:', projectId, JSON.stringify(update, null, 2));
+    // Parse and validate incoming update
+    let update: TelegramUpdate;
+    try {
+      const rawBody = await req.text();
+      // Limit payload size (prevent DoS)
+      if (rawBody.length > 100000) {
+        console.error('Payload too large:', rawBody.length);
+        return new Response(JSON.stringify({ error: 'Payload too large' }), {
+          status: 413,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      update = JSON.parse(rawBody);
+    } catch (e) {
+      console.error('Invalid JSON payload');
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log('Received Telegram update for project:', projectId);
 
     // Load bot configuration from database
     const { data: projectData, error: projectError } = await supabase
@@ -237,20 +260,29 @@ serve(async (req) => {
 
     const isFirstVisit = !sessionData;
 
-    // Build user context
+    // Sanitize user inputs to prevent injection
+    const sanitize = (str: string | undefined, maxLen: number = 100): string => {
+      if (!str || typeof str !== 'string') return '';
+      return str.slice(0, maxLen);
+    };
+
+    // Build user context with sanitized data
     const userContext: UserContext = {
-      first_name: userFirstName,
-      last_name: userLastName || '',
-      username: username || '',
+      first_name: sanitize(userFirstName, 64),
+      last_name: sanitize(userLastName, 64),
+      username: sanitize(username, 32),
       user_id: userId.toString(),
       date: new Date().toLocaleDateString('ru-RU'),
       time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
       ...session.variables,
     };
 
+    // Secure interpolation - only allow alphanumeric variable names
     const interpolate = (text: string) => {
-      return text.replace(/\{(\w+)\}/g, (match, key) => {
-        return (userContext as any)[key]?.toString() ?? match;
+      if (!text || typeof text !== 'string') return '';
+      return text.slice(0, 4000).replace(/\{(\w+)\}/g, (match, key) => {
+        const value = (userContext as any)[key];
+        return value !== undefined ? String(value).slice(0, 500) : match;
       });
     };
 
@@ -273,38 +305,54 @@ serve(async (req) => {
         await sendMessage(botToken, chatId, welcomeText);
       }
     } else if (callbackData) {
-      // Handle button clicks
+      // Validate callback data format and length
+      if (callbackData.length > 200) {
+        console.warn('Callback data too long:', callbackData.length);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Handle button clicks with validated UUIDs
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      
       if (callbackData.startsWith('menu_')) {
         const menuId = callbackData.replace('menu_', '');
-        const menu = menus.get(menuId);
-        if (menu) {
-          const menuText = interpolate(menu.message_text || menu.name);
-          const keyboard = buildInlineKeyboard(menu.buttons);
-          await sendMessage(botToken, chatId, menuText, keyboard);
-          session.current_menu_id = menu.id;
+        if (uuidRegex.test(menuId)) {
+          const menu = menus.get(menuId);
+          if (menu) {
+            const menuText = interpolate(menu.message_text || menu.name);
+            const keyboard = buildInlineKeyboard(menu.buttons);
+            await sendMessage(botToken, chatId, menuText, keyboard);
+            session.current_menu_id = menu.id;
+          }
         }
       } else if (callbackData.startsWith('action_')) {
         const actionId = callbackData.replace('action_', '');
-        session = await executeActionChain(botToken, chatId, actionId, actionNodes, menus, session, userContext, interpolate);
+        if (uuidRegex.test(actionId)) {
+          session = await executeActionChain(botToken, chatId, actionId, actionNodes, menus, session, userContext, interpolate);
+        }
       } else if (callbackData.startsWith('btn_')) {
         // Button click - find button and execute its actions
         const buttonId = callbackData.replace('btn_', '');
-        const button = findButton(buttonsData || [], buttonId);
-        if (button) {
-          if (button.target_menu_id) {
-            const menu = menus.get(button.target_menu_id);
-            if (menu) {
-              const menuText = interpolate(menu.message_text || menu.name);
-              const keyboard = buildInlineKeyboard(menu.buttons);
-              await sendMessage(botToken, chatId, menuText, keyboard);
-              session.current_menu_id = menu.id;
-            }
-          } else if (button.target_action_id) {
-            session = await executeActionChain(botToken, chatId, button.target_action_id, actionNodes, menus, session, userContext, interpolate);
-          } else if (button.actions && button.actions.length > 0) {
-            // Execute inline actions
-            for (const action of button.actions) {
-              await executeAction(botToken, chatId, action, session, userContext, interpolate);
+        if (uuidRegex.test(buttonId)) {
+          const button = findButton(buttonsData || [], buttonId);
+          if (button) {
+            if (button.target_menu_id) {
+              const menu = menus.get(button.target_menu_id);
+              if (menu) {
+                const menuText = interpolate(menu.message_text || menu.name);
+                const keyboard = buildInlineKeyboard(menu.buttons);
+                await sendMessage(botToken, chatId, menuText, keyboard);
+                session.current_menu_id = menu.id;
+              }
+            } else if (button.target_action_id) {
+              session = await executeActionChain(botToken, chatId, button.target_action_id, actionNodes, menus, session, userContext, interpolate);
+            } else if (button.actions && button.actions.length > 0) {
+              // Execute inline actions
+              for (const action of button.actions) {
+                await executeAction(botToken, chatId, action, session, userContext, interpolate);
+              }
             }
           }
         }

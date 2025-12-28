@@ -400,7 +400,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_profile_id_for_telegram: {
+        Args: { telegram_id_param: string }
+        Returns: string
+      }
+      profile_owns_project: {
+        Args: { profile_id_param: string; project_id_param: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

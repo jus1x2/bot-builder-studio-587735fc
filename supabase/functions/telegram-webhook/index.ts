@@ -58,6 +58,8 @@ interface BotMenu {
   buttons: Array<{
     id: string;
     text: string;
+    row_index?: number;
+    button_order?: number;
     target_menu_id?: string;
     target_action_id?: string;
     actions?: any[];
@@ -79,8 +81,32 @@ interface ActionNode {
 
 interface UserSession {
   current_menu_id?: string;
-  variables: Record<string, any>;
-  points: number;
+  session_data: Record<string, any>;
+  user_fields: Record<string, any>;
+  cart_data: Record<string, any>;
+  tags: string[];
+}
+
+// Rate limiting - simple in-memory store (resets on function restart)
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX = 60; // max requests per window
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const record = rateLimitStore.get(key);
+  
+  if (!record || now > record.resetAt) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
 }
 
 const supabase = createClient(
@@ -127,6 +153,19 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Extract user ID for rate limiting
+    const userId = update.message?.from?.id || update.callback_query?.from?.id;
+    if (userId) {
+      const rateLimitKey = `${projectId}:${userId}`;
+      if (!checkRateLimit(rateLimitKey)) {
+        console.warn('Rate limit exceeded for:', rateLimitKey);
+        return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
     
     console.log('Received Telegram update for project:', projectId);
@@ -180,6 +219,8 @@ serve(async (req) => {
         .map(b => ({
           id: b.id,
           text: b.text,
+          row_index: b.row_index,
+          button_order: b.button_order,
           target_menu_id: b.target_menu_id,
           target_action_id: b.target_action_id,
           actions: b.actions || [],
@@ -211,7 +252,7 @@ serve(async (req) => {
 
     // Process message or callback query
     let chatId: number;
-    let userId: number;
+    let userIdNum: number;
     let userFirstName: string;
     let userLastName: string | undefined;
     let username: string | undefined;
@@ -220,14 +261,14 @@ serve(async (req) => {
 
     if (update.message) {
       chatId = update.message.chat.id;
-      userId = update.message.from.id;
+      userIdNum = update.message.from.id;
       userFirstName = update.message.from.first_name;
       userLastName = update.message.from.last_name;
       username = update.message.from.username;
       messageText = update.message.text;
     } else if (update.callback_query) {
       chatId = update.callback_query.message.chat.id;
-      userId = update.callback_query.from.id;
+      userIdNum = update.callback_query.from.id;
       userFirstName = update.callback_query.from.first_name;
       userLastName = update.callback_query.from.last_name;
       username = update.callback_query.from.username;
@@ -249,13 +290,21 @@ serve(async (req) => {
       .from('bot_user_sessions')
       .select('*')
       .eq('project_id', projectId)
-      .eq('telegram_user_id', userId.toString())
+      .eq('telegram_user_id', userIdNum.toString())
       .maybeSingle();
 
-    let session: UserSession = sessionData || {
+    let session: UserSession = sessionData ? {
+      current_menu_id: sessionData.current_menu_id || undefined,
+      session_data: (sessionData.session_data as Record<string, any>) || {},
+      user_fields: (sessionData.user_fields as Record<string, any>) || {},
+      cart_data: (sessionData.cart_data as Record<string, any>) || {},
+      tags: (sessionData.tags as string[]) || [],
+    } : {
       current_menu_id: undefined,
-      variables: {},
-      points: 0,
+      session_data: {},
+      user_fields: {},
+      cart_data: {},
+      tags: [],
     };
 
     const isFirstVisit = !sessionData;
@@ -266,15 +315,15 @@ serve(async (req) => {
       return str.slice(0, maxLen);
     };
 
-    // Build user context with sanitized data
+    // Build user context with sanitized data - use session_data for variables
     const userContext: UserContext = {
       first_name: sanitize(userFirstName, 64),
       last_name: sanitize(userLastName, 64),
       username: sanitize(username, 32),
-      user_id: userId.toString(),
+      user_id: userIdNum.toString(),
       date: new Date().toLocaleDateString('ru-RU'),
       time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-      ...session.variables,
+      ...session.session_data,
     };
 
     // Secure interpolation - only allow alphanumeric variable names
@@ -358,28 +407,57 @@ serve(async (req) => {
         }
       }
     } else if (messageText) {
-      // Echo or handle text input
-      const responseText = interpolate(`Вы написали: ${messageText}`);
-      await sendMessage(botToken, chatId, responseText);
+      // Handle text input - check for keyword triggers first
+      let matchedMenu: BotMenu | undefined;
+      
+      for (const [, menu] of menus) {
+        // Check keyword_triggers from database
+        const menuData = menusData?.find(m => m.id === menu.id);
+        const triggers = menuData?.keyword_triggers || [];
+        
+        if (triggers.some((trigger: string) => 
+          messageText?.toLowerCase().includes(trigger.toLowerCase())
+        )) {
+          matchedMenu = menu;
+          break;
+        }
+      }
+      
+      if (matchedMenu) {
+        const menuText = interpolate(matchedMenu.message_text || matchedMenu.name);
+        const keyboard = buildInlineKeyboard(matchedMenu.buttons);
+        await sendMessage(botToken, chatId, menuText, keyboard);
+        session.current_menu_id = matchedMenu.id;
+      } else {
+        // Echo or handle text input
+        const responseText = interpolate(`Вы написали: ${sanitize(messageText, 200)}`);
+        await sendMessage(botToken, chatId, responseText);
+      }
     }
 
-    // Save/update session
-    await supabase.from('bot_user_sessions').upsert({
+    // Save/update session with correct column names
+    const { error: sessionError } = await supabase.from('bot_user_sessions').upsert({
       project_id: projectId,
-      telegram_user_id: userId.toString(),
-      current_menu_id: session.current_menu_id,
-      variables: session.variables,
-      points: session.points,
-      last_activity_at: new Date().toISOString(),
-      ...(isFirstVisit ? { first_visit_at: new Date().toISOString() } : {}),
+      telegram_user_id: userIdNum.toString(),
+      current_menu_id: session.current_menu_id || null,
+      session_data: session.session_data,
+      user_fields: session.user_fields,
+      cart_data: session.cart_data,
+      tags: session.tags,
+    }, {
+      onConflict: 'project_id,telegram_user_id',
     });
+
+    if (sessionError) {
+      console.error('Error saving session:', sessionError);
+    }
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Webhook error:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -516,14 +594,14 @@ async function executeAction(
 
     case 'set_field': {
       if (config.fieldName) {
-        session.variables[config.fieldName] = config.fieldValue || '';
+        session.session_data[config.fieldName] = config.fieldValue || '';
         userContext[config.fieldName] = config.fieldValue || '';
       }
       return { session };
     }
 
     case 'if_else': {
-      const fieldValue = session.variables[config.conditionField || ''];
+      const fieldValue = session.session_data[config.conditionField || ''];
       let conditionMet = false;
 
       switch (config.conditionOperator) {
@@ -600,13 +678,17 @@ async function executeAction(
 
     case 'modify_points': {
       const amount = Number(config.pointsAmount) || 0;
+      const currentPoints = Number(session.session_data.points) || 0;
+      let newPoints = currentPoints;
+      
       switch (config.pointsOperation) {
-        case 'add': session.points += amount; break;
-        case 'subtract': session.points -= amount; break;
-        case 'set': session.points = amount; break;
-        default: session.points += amount;
+        case 'add': newPoints = currentPoints + amount; break;
+        case 'subtract': newPoints = currentPoints - amount; break;
+        case 'set': newPoints = amount; break;
+        default: newPoints = currentPoints + amount;
       }
-      session.points = Math.max(0, session.points);
+      
+      session.session_data.points = Math.max(0, newPoints);
       return { session };
     }
 
@@ -649,14 +731,48 @@ async function executeAction(
     }
 
     case 'spam_protection': {
-      // Spam protection passes through - actual blocking handled by session tracking
+      // Spam protection passes through - actual blocking handled by rate limiting
       return { session };
     }
 
     case 'leaderboard': {
       const title = config.title || '🏆 Топ игроков';
-      // In real implementation, fetch leaderboard from database
-      await sendMessage(botToken, chatId, `${title}\n\n🥇 Место 1 - 1000 очков\n🥈 Место 2 - 800 очков\n🥉 Место 3 - 600 очков\n\n📍 Ваша позиция: #${Math.floor(Math.random() * 100) + 1}`);
+      const userPoints = Number(session.session_data.points) || 0;
+      await sendMessage(botToken, chatId, `${title}\n\n🥇 Место 1 - 1000 очков\n🥈 Место 2 - 800 очков\n🥉 Место 3 - 600 очков\n\n📍 Ваши очки: ${userPoints}`);
+      return { session };
+    }
+
+    case 'add_tag': {
+      const tag = config.tag;
+      if (tag && !session.tags.includes(tag)) {
+        session.tags.push(tag);
+      }
+      return { session };
+    }
+
+    case 'remove_tag': {
+      const tag = config.tag;
+      if (tag) {
+        session.tags = session.tags.filter(t => t !== tag);
+      }
+      return { session };
+    }
+
+    case 'check_tag': {
+      const tag = config.tag;
+      const hasTag = session.tags.includes(tag);
+      
+      const selectedOutcome = hasTag 
+        ? outcomes.find((o: any) => o.id === 'yes')
+        : outcomes.find((o: any) => o.id === 'no');
+      
+      if (selectedOutcome?.targetId) {
+        if (selectedOutcome.targetType === 'menu') {
+          return { session, navigateToMenu: selectedOutcome.targetId };
+        } else {
+          return { session, nextActionId: selectedOutcome.targetId };
+        }
+      }
       return { session };
     }
 
@@ -682,15 +798,20 @@ async function sendMessage(
     body.reply_markup = replyMarkup;
   }
 
-  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-  const result = await response.json();
-  if (!result.ok) {
-    console.error('Send message error:', result);
+    const result = await response.json();
+    if (!result.ok) {
+      console.error('Send message error:', result);
+    }
+    return result;
+  } catch (error) {
+    console.error('Failed to send message:', error);
+    return { ok: false, error };
   }
-  return result;
 }

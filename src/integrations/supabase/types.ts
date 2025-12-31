@@ -400,6 +400,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_current_profile_id: { Args: never; Returns: string }
       get_profile_id_for_telegram: {
         Args: { telegram_id_param: string }
         Returns: string

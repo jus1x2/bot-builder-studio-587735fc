@@ -1,5 +1,8 @@
-import { supabase } from '@/integrations/supabase/client';
+import { getAuthenticatedSupabase } from '@/lib/supabase-helper';
 import { BotProject, BotMenu, BotButton, BotActionNode } from '@/types/bot';
+
+// Get supabase client - use helper to ensure telegram ID header is set
+const getSupabase = () => getAuthenticatedSupabase();
 
 // Save project to database
 // Track ongoing saves to prevent race conditions
@@ -31,6 +34,7 @@ export async function saveProjectToDatabase(project: BotProject, profileId: stri
     }
 
     // Upsert project
+    const supabase = getSupabase();
     const { error: projectError } = await supabase
       .from('bot_projects')
       .upsert({
@@ -186,6 +190,8 @@ export async function loadProjectFromDatabase(projectId: string): Promise<BotPro
   try {
     console.log('Loading project from database:', projectId);
 
+    const supabase = getSupabase();
+    
     // Load project
     const { data: projectData, error: projectError } = await supabase
       .from('bot_projects')
@@ -315,6 +321,8 @@ export async function loadAllProjectsFromDatabase(profileId: string): Promise<Bo
   try {
     console.log('Loading all projects for profile:', profileId);
 
+    const supabase = getSupabase();
+    
     const { data: projectsData, error } = await supabase
       .from('bot_projects')
       .select('*')
@@ -348,6 +356,8 @@ export async function deleteProjectFromDatabase(projectId: string): Promise<bool
   try {
     console.log('Deleting project:', projectId);
 
+    const supabase = getSupabase();
+    
     const { error } = await supabase
       .from('bot_projects')
       .delete()

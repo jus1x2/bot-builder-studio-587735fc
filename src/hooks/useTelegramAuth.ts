@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { setTelegramUserId } from '@/lib/supabase-helper';
 
 export interface TelegramUser {
   id: number;
@@ -67,6 +68,10 @@ export function useTelegramAuth() {
 
       if (data?.profile) {
         setProfile(data.profile);
+        // Set telegram ID for RLS header
+        if (data.profile.telegram_id) {
+          setTelegramUserId(data.profile.telegram_id);
+        }
       }
 
       if (data?.telegram_user) {

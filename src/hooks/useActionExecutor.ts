@@ -11,6 +11,13 @@ export interface UserContext {
   [key: string]: string | number;
 }
 
+export interface CartItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 export interface ExecutionState {
   messages: Array<{
     id: string;
@@ -20,8 +27,26 @@ export interface ExecutionState {
   }>;
   isTyping: boolean;
   isExecuting: boolean;
+  isWaitingForInput: boolean;
+  inputConfig?: {
+    fieldName: string;
+    inputType: string;
+    validationRegex?: string;
+    errorMessage?: string;
+    successAction?: string;
+    timeoutSeconds?: number;
+    timeoutAction?: string;
+  };
   variables: Record<string, any>;
+  tags: string[];
   points: number;
+  cart: CartItem[];
+  scheduledMessages: Array<{
+    id: string;
+    text: string;
+    scheduledAt: Date;
+    executed: boolean;
+  }>;
 }
 
 const DEFAULT_USER_CONTEXT: UserContext = {
@@ -45,8 +70,12 @@ export function useActionExecutor(menus: BotMenu[]) {
     messages: [],
     isTyping: false,
     isExecuting: false,
+    isWaitingForInput: false,
     variables: {},
+    tags: [],
     points: 0,
+    cart: [],
+    scheduledMessages: [],
   });
 
   const [userContext, setUserContext] = useState<UserContext>(DEFAULT_USER_CONTEXT);
@@ -282,23 +311,61 @@ export function useActionExecutor(menus: BotMenu[]) {
       }
 
       case 'update_quantity': {
-        const { cartItem, quantityChange } = action.config;
+        const { cartItemId, cartItem, quantityChange, quantityOperation } = action.config;
+        const itemId = cartItemId || cartItem;
+        const change = Number(quantityChange) || 1;
+        
+        setState(prev => {
+          const itemIndex = prev.cart.findIndex(item => 
+            item.productId === itemId || item.name === itemId
+          );
+          if (itemIndex >= 0) {
+            const newCart = [...prev.cart];
+            const currentQty = newCart[itemIndex].quantity;
+            const newQty = quantityOperation === 'set' ? change : 
+                          quantityOperation === 'subtract' ? currentQty - change : 
+                          currentQty + change;
+            newCart[itemIndex].quantity = Math.max(0, newQty);
+            return { 
+              ...prev, 
+              cart: newCart.filter(item => item.quantity > 0) 
+            };
+          }
+          return prev;
+        });
         addMessage(`🛒 Количество "${cartItem || 'товар'}" изменено на ${quantityChange || 1}`);
         return null;
       }
 
       case 'remove_from_cart': {
-        const { removeItem } = action.config;
+        const { removeItemId, removeItem } = action.config;
+        const itemId = removeItemId || removeItem;
+        
+        setState(prev => ({
+          ...prev,
+          cart: prev.cart.filter(item => 
+            item.productId !== itemId && item.name !== itemId
+          ),
+        }));
         addMessage(`🗑️ "${removeItem || 'товар'}" удален из корзины`);
         return null;
       }
 
       case 'show_cart': {
-        addMessage(`🛒 **Ваша корзина:**\n• Товар 1 x2 - 200₽\n• Товар 2 x1 - 150₽\n\n**Итого: 550₽**`);
+        if (state.cart.length === 0) {
+          addMessage(`🛒 Ваша корзина пуста`);
+        } else {
+          const cartItems = state.cart.map(item => 
+            `• ${item.name} x${item.quantity} — ${item.price * item.quantity} ₽`
+          ).join('\n');
+          const total = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+          addMessage(`🛒 **Ваша корзина:**\n${cartItems}\n\n**Итого: ${total} ₽**`);
+        }
         return null;
       }
 
       case 'clear_cart': {
+        setState(prev => ({ ...prev, cart: [] }));
         addMessage(`🗑️ Корзина очищена`);
         return null;
       }
@@ -349,6 +416,277 @@ export function useActionExecutor(menus: BotMenu[]) {
         return null;
       }
 
+      // ============= MISSING ACTIONS IMPLEMENTATION =============
+
+      case 'change_field': {
+        const { changeFieldName, changeAmount, changeOperation } = action.config;
+        if (changeFieldName) {
+          setState(prev => {
+            const currentValue = Number(prev.variables[changeFieldName]) || 0;
+            const amount = Number(changeAmount) || 0;
+            let newValue: number;
+            
+            switch (changeOperation) {
+              case 'add': newValue = currentValue + amount; break;
+              case 'subtract': newValue = currentValue - amount; break;
+              case 'multiply': newValue = currentValue * amount; break;
+              case 'divide': newValue = amount !== 0 ? currentValue / amount : currentValue; break;
+              default: newValue = currentValue + amount;
+            }
+            
+            return {
+              ...prev,
+              variables: { ...prev.variables, [changeFieldName]: newValue },
+            };
+          });
+          const opSymbol = changeOperation === 'subtract' ? '-' : changeOperation === 'multiply' ? '×' : changeOperation === 'divide' ? '÷' : '+';
+          addMessage(`🔢 ${changeFieldName} ${opSymbol} ${changeAmount}`);
+        }
+        return null;
+      }
+
+      case 'add_tag': {
+        const { tagName } = action.config;
+        if (tagName) {
+          setState(prev => {
+            if (!prev.tags.includes(tagName)) {
+              return { ...prev, tags: [...prev.tags, tagName] };
+            }
+            return prev;
+          });
+          addMessage(`🏷️ Тег добавлен: ${tagName}`);
+        }
+        return null;
+      }
+
+      case 'remove_tag': {
+        const { tagName } = action.config;
+        if (tagName) {
+          setState(prev => ({
+            ...prev,
+            tags: prev.tags.filter(t => t !== tagName),
+          }));
+          addMessage(`🏷️ Тег удалён: ${tagName}`);
+        }
+        return null;
+      }
+
+      case 'check_subscription': {
+        const { channelId, subscribedAction, notSubscribedAction } = action.config;
+        // В превью симулируем случайный результат
+        const isSubscribed = Math.random() > 0.5;
+        addMessage(`📢 Проверка подписки на ${channelId || '@channel'}: ${isSubscribed ? '✅ подписан' : '❌ не подписан'}`);
+        return isSubscribed ? (subscribedAction || null) : (notSubscribedAction || null);
+      }
+
+      case 'wait_response': {
+        const { 
+          waitFieldName, 
+          waitInputType, 
+          waitValidation, 
+          waitErrorMessage, 
+          waitSuccessAction,
+          waitTimeoutSeconds,
+          waitTimeoutAction 
+        } = action.config;
+        
+        setState(prev => ({
+          ...prev,
+          isWaitingForInput: true,
+          inputConfig: {
+            fieldName: waitFieldName || 'response',
+            inputType: waitInputType || 'text',
+            validationRegex: waitValidation,
+            errorMessage: waitErrorMessage || 'Неверный формат ввода',
+            successAction: waitSuccessAction,
+            timeoutSeconds: waitTimeoutSeconds,
+            timeoutAction: waitTimeoutAction,
+          },
+        }));
+        
+        addMessage(`⏳ Ожидание ${waitInputType === 'phone' ? 'телефона' : waitInputType === 'email' ? 'email' : waitInputType === 'number' ? 'числа' : 'ответа'}...`);
+        
+        // В превью симулируем ввод через 2 секунды
+        await delay(2000);
+        const simulatedInput = waitInputType === 'phone' ? '+7 999 123 45 67' : 
+                               waitInputType === 'email' ? 'user@example.com' : 
+                               waitInputType === 'number' ? '42' : 'Да';
+        
+        setVariable(waitFieldName || 'response', simulatedInput);
+        addMessage(simulatedInput, 'user');
+        setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
+        
+        return waitSuccessAction || null;
+      }
+
+      case 'keyword_trigger': {
+        const { keywords, keywordMatchAction, keywordNoMatchAction } = action.config;
+        const keywordList = (keywords || '').split(',').map((k: string) => k.trim()).filter(Boolean);
+        addMessage(`🔍 Триггер по ключевым словам: ${keywordList.join(', ') || 'не указаны'}`);
+        // Симуляция совпадения
+        const matched = keywordList.length > 0 && Math.random() > 0.3;
+        if (matched) {
+          addMessage(`✅ Найдено совпадение с "${keywordList[0]}"`);
+          return keywordMatchAction || null;
+        } else {
+          addMessage(`❌ Совпадений не найдено`);
+          return keywordNoMatchAction || null;
+        }
+      }
+
+      case 'no_response': {
+        const { noResponseTimeout, noResponseAction } = action.config;
+        addMessage(`⏰ Обработчик "нет ответа" через ${noResponseTimeout || 60} сек.`);
+        // В превью симулируем быстро
+        setTimeout(() => {
+          if (!abortRef.current) {
+            addMessage(`⏰ Пользователь не ответил вовремя`);
+          }
+        }, Math.min((noResponseTimeout || 60) * 1000, 3000));
+        return null;
+      }
+
+      case 'wrong_response': {
+        const { wrongResponseMessage, wrongResponseAction, maxAttempts } = action.config;
+        addMessage(`❌ Обработчик неверного ответа настроен (макс. попыток: ${maxAttempts || 3})`);
+        addMessage(`Сообщение при ошибке: "${wrongResponseMessage || 'Неверный ответ, попробуйте ещё раз'}"`);
+        return null;
+      }
+
+      case 'add_to_cart': {
+        const { productId, productName, productPrice, productQuantity } = action.config;
+        const name = productName || 'Товар';
+        const price = Number(productPrice) || 0;
+        const quantity = Number(productQuantity) || 1;
+        
+        setState(prev => {
+          const existingIndex = prev.cart.findIndex(item => item.productId === productId);
+          if (existingIndex >= 0) {
+            const newCart = [...prev.cart];
+            newCart[existingIndex].quantity += quantity;
+            return { ...prev, cart: newCart };
+          } else {
+            return {
+              ...prev,
+              cart: [...prev.cart, { productId: productId || crypto.randomUUID(), name, price, quantity }],
+            };
+          }
+        });
+        addMessage(`🛒 Добавлено в корзину: ${name} x${quantity} (${price * quantity} ₽)`);
+        return null;
+      }
+
+      case 'process_payment': {
+        const { paymentAmount, paymentMethod, paymentSuccessAction, paymentFailAction } = action.config;
+        const amount = paymentAmount || state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        
+        addMessage(`💳 Обработка платежа: ${amount} ₽`);
+        addMessage(`Способ оплаты: ${paymentMethod || 'Telegram Payments'}`);
+        
+        // Симуляция оплаты
+        setTyping(true);
+        await delay(2000);
+        setTyping(false);
+        
+        const success = Math.random() > 0.2;
+        if (success) {
+          addMessage(`✅ Оплата успешна! Чек #${Math.floor(Math.random() * 100000)}`);
+          setState(prev => ({ ...prev, cart: [] })); // Очищаем корзину
+          return paymentSuccessAction || null;
+        } else {
+          addMessage(`❌ Ошибка оплаты. Попробуйте позже.`);
+          return paymentFailAction || null;
+        }
+      }
+
+      case 'request_input': {
+        const { 
+          inputFieldName, 
+          inputPrompt, 
+          inputType, 
+          inputValidation, 
+          inputErrorMessage, 
+          inputSuccessAction 
+        } = action.config;
+        
+        if (inputPrompt) {
+          addMessage(inputPrompt);
+        }
+        
+        setState(prev => ({
+          ...prev,
+          isWaitingForInput: true,
+          inputConfig: {
+            fieldName: inputFieldName || 'input',
+            inputType: inputType || 'text',
+            validationRegex: inputValidation,
+            errorMessage: inputErrorMessage || 'Неверный формат',
+            successAction: inputSuccessAction,
+          },
+        }));
+        
+        // Симуляция ввода
+        await delay(1500);
+        const simulatedValue = inputType === 'phone' ? '+7 999 000 00 00' : 
+                              inputType === 'email' ? 'test@test.com' : 
+                              inputType === 'number' ? '123' : 'Ответ пользователя';
+        
+        setVariable(inputFieldName || 'input', simulatedValue);
+        addMessage(simulatedValue, 'user');
+        setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
+        
+        return inputSuccessAction || null;
+      }
+
+      case 'send_notification': {
+        const { notificationMessage, notificationRecipient } = action.config;
+        addMessage(`🔔 Уведомление отправлено${notificationRecipient ? ` для ${notificationRecipient}` : ''}: "${notificationMessage || 'Уведомление'}"`);
+        return null;
+      }
+
+      case 'schedule_message': {
+        const { scheduleMessage, scheduleDelayMinutes, scheduleDateTime } = action.config;
+        const delayText = scheduleDateTime || `через ${scheduleDelayMinutes || 60} мин.`;
+        
+        const scheduledId = crypto.randomUUID();
+        setState(prev => ({
+          ...prev,
+          scheduledMessages: [
+            ...prev.scheduledMessages,
+            {
+              id: scheduledId,
+              text: scheduleMessage || 'Запланированное сообщение',
+              scheduledAt: new Date(Date.now() + (scheduleDelayMinutes || 60) * 60000),
+              executed: false,
+            },
+          ],
+        }));
+        
+        addMessage(`📅 Запланировано сообщение ${delayText}: "${scheduleMessage || 'Сообщение'}"`);
+        
+        // В превью показываем через 3 сек
+        setTimeout(() => {
+          if (!abortRef.current) {
+            addMessage(`📬 [Запланированное]: ${scheduleMessage || 'Сообщение'}`);
+          }
+        }, 3000);
+        
+        return null;
+      }
+
+      case 'broadcast': {
+        const { broadcastMessage, broadcastFilter, broadcastTag } = action.config;
+        const filterText = broadcastFilter === 'tag' ? `с тегом "${broadcastTag}"` : 
+                          broadcastFilter === 'all' ? 'всем' : 
+                          broadcastFilter === 'active' ? 'активным' : 'всем';
+        
+        addMessage(`📢 Рассылка ${filterText}:`);
+        addMessage(`"${broadcastMessage || 'Сообщение рассылки'}"`);
+        addMessage(`📊 Отправлено: ~1,234 пользователям`);
+        
+        return null;
+      }
+
       default:
         addMessage(`⚙️ Действие: ${action.type}`);
         return null;
@@ -382,15 +720,71 @@ export function useActionExecutor(menus: BotMenu[]) {
       messages: [],
       isTyping: false,
       isExecuting: false,
+      isWaitingForInput: false,
       variables: {},
+      tags: [],
       points: 0,
+      cart: [],
+      scheduledMessages: [],
     });
   }, []);
 
   const abort = useCallback(() => {
     abortRef.current = true;
-    setState(prev => ({ ...prev, isExecuting: false, isTyping: false }));
+    setState(prev => ({ ...prev, isExecuting: false, isTyping: false, isWaitingForInput: false }));
   }, []);
+
+  const addTag = useCallback((tagName: string) => {
+    setState(prev => {
+      if (!prev.tags.includes(tagName)) {
+        return { ...prev, tags: [...prev.tags, tagName] };
+      }
+      return prev;
+    });
+  }, []);
+
+  const removeTag = useCallback((tagName: string) => {
+    setState(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t !== tagName),
+    }));
+  }, []);
+
+  const addToCart = useCallback((item: CartItem) => {
+    setState(prev => {
+      const existingIndex = prev.cart.findIndex(i => i.productId === item.productId);
+      if (existingIndex >= 0) {
+        const newCart = [...prev.cart];
+        newCart[existingIndex].quantity += item.quantity;
+        return { ...prev, cart: newCart };
+      }
+      return { ...prev, cart: [...prev.cart, item] };
+    });
+  }, []);
+
+  const updateCartQuantity = useCallback((productId: string, quantity: number) => {
+    setState(prev => ({
+      ...prev,
+      cart: prev.cart.map(item =>
+        item.productId === productId ? { ...item, quantity: Math.max(0, quantity) } : item
+      ).filter(item => item.quantity > 0),
+    }));
+  }, []);
+
+  const removeFromCart = useCallback((productId: string) => {
+    setState(prev => ({
+      ...prev,
+      cart: prev.cart.filter(item => item.productId !== productId),
+    }));
+  }, []);
+
+  const clearCart = useCallback(() => {
+    setState(prev => ({ ...prev, cart: [] }));
+  }, []);
+
+  const getCartTotal = useCallback(() => {
+    return state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  }, [state.cart]);
 
   return {
     state,
@@ -401,6 +795,13 @@ export function useActionExecutor(menus: BotMenu[]) {
     abort,
     setVariable,
     modifyPoints,
+    addTag,
+    removeTag,
+    addToCart,
+    updateCartQuantity,
+    removeFromCart,
+    clearCart,
+    getCartTotal,
     interpolateVariables: (text: string) => interpolateVariables(text, userContext),
   };
 }

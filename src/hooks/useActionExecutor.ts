@@ -419,169 +419,199 @@ export function useActionExecutor(menus: BotMenu[]) {
       // ============= MISSING ACTIONS IMPLEMENTATION =============
 
       case 'change_field': {
-        const { changeFieldName, changeAmount, changeOperation } = action.config;
-        if (changeFieldName) {
+        // Используем ключи из формы: field, operation, amount
+        const { field, operation, amount } = action.config;
+        if (field) {
           setState(prev => {
-            const currentValue = Number(prev.variables[changeFieldName]) || 0;
-            const amount = Number(changeAmount) || 0;
+            const currentValue = Number(prev.variables[field]) || 0;
+            const changeAmount = Number(amount) || 0;
             let newValue: number;
             
-            switch (changeOperation) {
-              case 'add': newValue = currentValue + amount; break;
-              case 'subtract': newValue = currentValue - amount; break;
-              case 'multiply': newValue = currentValue * amount; break;
-              case 'divide': newValue = amount !== 0 ? currentValue / amount : currentValue; break;
-              default: newValue = currentValue + amount;
+            switch (operation) {
+              case 'add': newValue = currentValue + changeAmount; break;
+              case 'subtract': newValue = currentValue - changeAmount; break;
+              case 'multiply': newValue = currentValue * changeAmount; break;
+              case 'divide': newValue = changeAmount !== 0 ? currentValue / changeAmount : currentValue; break;
+              default: newValue = currentValue + changeAmount;
             }
             
             return {
               ...prev,
-              variables: { ...prev.variables, [changeFieldName]: newValue },
+              variables: { ...prev.variables, [field]: newValue },
             };
           });
-          const opSymbol = changeOperation === 'subtract' ? '-' : changeOperation === 'multiply' ? '×' : changeOperation === 'divide' ? '÷' : '+';
-          addMessage(`🔢 ${changeFieldName} ${opSymbol} ${changeAmount}`);
+          const opSymbol = operation === 'subtract' ? '-' : operation === 'multiply' ? '×' : operation === 'divide' ? '÷' : '+';
+          addMessage(`🔢 ${field} ${opSymbol} ${amount}`);
         }
         return null;
       }
 
       case 'add_tag': {
-        const { tagName } = action.config;
-        if (tagName) {
+        // Используем ключ из формы: tag
+        const { tag } = action.config;
+        if (tag) {
           setState(prev => {
-            if (!prev.tags.includes(tagName)) {
-              return { ...prev, tags: [...prev.tags, tagName] };
+            if (!prev.tags.includes(tag)) {
+              return { ...prev, tags: [...prev.tags, tag] };
             }
             return prev;
           });
-          addMessage(`🏷️ Тег добавлен: ${tagName}`);
+          addMessage(`🏷️ Тег добавлен: ${tag}`);
         }
         return null;
       }
 
       case 'remove_tag': {
-        const { tagName } = action.config;
-        if (tagName) {
+        // Используем ключ из формы: tag
+        const { tag } = action.config;
+        if (tag) {
           setState(prev => ({
             ...prev,
-            tags: prev.tags.filter(t => t !== tagName),
+            tags: prev.tags.filter(t => t !== tag),
           }));
-          addMessage(`🏷️ Тег удалён: ${tagName}`);
+          addMessage(`🏷️ Тег удалён: ${tag}`);
         }
         return null;
       }
 
       case 'check_subscription': {
-        const { channelId, subscribedAction, notSubscribedAction } = action.config;
+        // Используем ключи из формы: channel, subscribedMenuId, notSubscribedMenuId
+        const { channel, subscribedMenuId, notSubscribedMenuId } = action.config;
         // В превью симулируем случайный результат
         const isSubscribed = Math.random() > 0.5;
-        addMessage(`📢 Проверка подписки на ${channelId || '@channel'}: ${isSubscribed ? '✅ подписан' : '❌ не подписан'}`);
-        return isSubscribed ? (subscribedAction || null) : (notSubscribedAction || null);
+        addMessage(`📢 Проверка подписки на ${channel || '@channel'}: ${isSubscribed ? '✅ подписан' : '❌ не подписан'}`);
+        return isSubscribed ? (subscribedMenuId || null) : (notSubscribedMenuId || null);
       }
 
       case 'wait_response': {
+        // Используем ключи из формы: timeout, saveToField, timeoutAction, timeoutMenuId, validationType
         const { 
-          waitFieldName, 
-          waitInputType, 
-          waitValidation, 
-          waitErrorMessage, 
-          waitSuccessAction,
-          waitTimeoutSeconds,
-          waitTimeoutAction 
+          timeout, 
+          saveToField, 
+          timeoutAction, 
+          timeoutMenuId,
+          validationType
         } = action.config;
         
         setState(prev => ({
           ...prev,
           isWaitingForInput: true,
           inputConfig: {
-            fieldName: waitFieldName || 'response',
-            inputType: waitInputType || 'text',
-            validationRegex: waitValidation,
-            errorMessage: waitErrorMessage || 'Неверный формат ввода',
-            successAction: waitSuccessAction,
-            timeoutSeconds: waitTimeoutSeconds,
-            timeoutAction: waitTimeoutAction,
+            fieldName: saveToField || 'response',
+            inputType: validationType || 'text',
+            errorMessage: 'Неверный формат ввода',
+            timeoutSeconds: timeout,
+            timeoutAction: timeoutAction,
           },
         }));
         
-        addMessage(`⏳ Ожидание ${waitInputType === 'phone' ? 'телефона' : waitInputType === 'email' ? 'email' : waitInputType === 'number' ? 'числа' : 'ответа'}...`);
+        const inputTypeLabel = validationType === 'phone' ? 'телефона' : 
+                               validationType === 'email' ? 'email' : 
+                               validationType === 'number' ? 'числа' : 'ответа';
+        addMessage(`⏳ Ожидание ${inputTypeLabel}...`);
         
         // В превью симулируем ввод через 2 секунды
         await delay(2000);
-        const simulatedInput = waitInputType === 'phone' ? '+7 999 123 45 67' : 
-                               waitInputType === 'email' ? 'user@example.com' : 
-                               waitInputType === 'number' ? '42' : 'Да';
+        const simulatedInput = validationType === 'phone' ? '+7 999 123 45 67' : 
+                               validationType === 'email' ? 'user@example.com' : 
+                               validationType === 'number' ? '42' : 'Да';
         
-        setVariable(waitFieldName || 'response', simulatedInput);
+        setVariable(saveToField || 'response', simulatedInput);
         addMessage(simulatedInput, 'user');
         setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
         
-        return waitSuccessAction || null;
+        // Если есть timeoutAction === 'menu', вернуть timeoutMenuId
+        if (timeoutAction === 'menu' && timeoutMenuId) {
+          return timeoutMenuId;
+        }
+        return null;
       }
 
       case 'keyword_trigger': {
-        const { keywords, keywordMatchAction, keywordNoMatchAction } = action.config;
-        const keywordList = (keywords || '').split(',').map((k: string) => k.trim()).filter(Boolean);
+        // Используем ключи из формы: keywords (массив), matchType, caseSensitive, targetMenuId
+        const { keywords, matchType, targetMenuId } = action.config;
+        const keywordList = Array.isArray(keywords) ? keywords : [];
         addMessage(`🔍 Триггер по ключевым словам: ${keywordList.join(', ') || 'не указаны'}`);
+        addMessage(`Режим поиска: ${matchType || 'contains'}`);
         // Симуляция совпадения
         const matched = keywordList.length > 0 && Math.random() > 0.3;
         if (matched) {
           addMessage(`✅ Найдено совпадение с "${keywordList[0]}"`);
-          return keywordMatchAction || null;
+          return targetMenuId || null;
         } else {
           addMessage(`❌ Совпадений не найдено`);
-          return keywordNoMatchAction || null;
+          return null;
         }
       }
 
       case 'no_response': {
-        const { noResponseTimeout, noResponseAction } = action.config;
-        addMessage(`⏰ Обработчик "нет ответа" через ${noResponseTimeout || 60} сек.`);
+        // Используем ключи из формы: timeout, action, reminderText, targetMenuId, tag
+        const { timeout, action: responseAction, reminderText, targetMenuId, tag } = action.config;
+        addMessage(`⏰ Обработчик "нет ответа" через ${timeout || 300} сек.`);
+        addMessage(`Действие: ${responseAction || 'send_reminder'}`);
         // В превью симулируем быстро
         setTimeout(() => {
           if (!abortRef.current) {
-            addMessage(`⏰ Пользователь не ответил вовремя`);
+            if (responseAction === 'send_reminder') {
+              addMessage(`📨 Напоминание: ${reminderText || 'Вы ещё здесь?'}`);
+            } else if (responseAction === 'add_tag' && tag) {
+              addMessage(`🏷️ Добавлен тег: ${tag}`);
+            } else {
+              addMessage(`⏰ Пользователь не ответил вовремя`);
+            }
           }
-        }, Math.min((noResponseTimeout || 60) * 1000, 3000));
+        }, Math.min((timeout || 300) * 1000, 3000));
         return null;
       }
 
       case 'wrong_response': {
-        const { wrongResponseMessage, wrongResponseAction, maxAttempts } = action.config;
-        addMessage(`❌ Обработчик неверного ответа настроен (макс. попыток: ${maxAttempts || 3})`);
-        addMessage(`Сообщение при ошибке: "${wrongResponseMessage || 'Неверный ответ, попробуйте ещё раз'}"`);
+        // Используем ключи из формы: message, maxRetries, retryAction, targetMenuId
+        const { message, maxRetries, retryAction } = action.config;
+        addMessage(`❌ Обработчик неверного ответа настроен (макс. попыток: ${maxRetries || 3})`);
+        addMessage(`Сообщение при ошибке: "${message || 'Неверный ответ, попробуйте ещё раз'}"`);
+        addMessage(`Действие: ${retryAction || 'retry'}`);
         return null;
       }
 
       case 'add_to_cart': {
-        const { productId, productName, productPrice, productQuantity } = action.config;
-        const name = productName || 'Товар';
-        const price = Number(productPrice) || 0;
-        const quantity = Number(productQuantity) || 1;
+        // Используем ключи из формы: productId, name, price, currency, quantity
+        const { productId, name, price, quantity } = action.config;
+        const productName = name || 'Товар';
+        const productPrice = Number(price) || 0;
+        const productQuantity = Number(quantity) || 1;
         
         setState(prev => {
           const existingIndex = prev.cart.findIndex(item => item.productId === productId);
           if (existingIndex >= 0) {
             const newCart = [...prev.cart];
-            newCart[existingIndex].quantity += quantity;
+            newCart[existingIndex].quantity += productQuantity;
             return { ...prev, cart: newCart };
           } else {
             return {
               ...prev,
-              cart: [...prev.cart, { productId: productId || crypto.randomUUID(), name, price, quantity }],
+              cart: [...prev.cart, { 
+                productId: productId || crypto.randomUUID(), 
+                name: productName, 
+                price: productPrice, 
+                quantity: productQuantity 
+              }],
             };
           }
         });
-        addMessage(`🛒 Добавлено в корзину: ${name} x${quantity} (${price * quantity} ₽)`);
+        addMessage(`🛒 Добавлено в корзину: ${productName} x${productQuantity} (${productPrice * productQuantity} ₽)`);
         return null;
       }
 
       case 'process_payment': {
-        const { paymentAmount, paymentMethod, paymentSuccessAction, paymentFailAction } = action.config;
-        const amount = paymentAmount || state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        // Используем ключи из формы: provider, successMenuId, failMenuId
+        const { provider, successMenuId, failMenuId } = action.config;
+        const amount = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        
+        const providerName = provider === 'yookassa' ? 'ЮKassa' : 
+                            provider === 'stripe' ? 'Stripe' : 'Telegram Stars';
         
         addMessage(`💳 Обработка платежа: ${amount} ₽`);
-        addMessage(`Способ оплаты: ${paymentMethod || 'Telegram Payments'}`);
+        addMessage(`Способ оплаты: ${providerName}`);
         
         // Симуляция оплаты
         setTyping(true);
@@ -592,61 +622,54 @@ export function useActionExecutor(menus: BotMenu[]) {
         if (success) {
           addMessage(`✅ Оплата успешна! Чек #${Math.floor(Math.random() * 100000)}`);
           setState(prev => ({ ...prev, cart: [] })); // Очищаем корзину
-          return paymentSuccessAction || null;
+          return successMenuId || null;
         } else {
           addMessage(`❌ Ошибка оплаты. Попробуйте позже.`);
-          return paymentFailAction || null;
+          return failMenuId || null;
         }
       }
 
       case 'request_input': {
-        const { 
-          inputFieldName, 
-          inputPrompt, 
-          inputType, 
-          inputValidation, 
-          inputErrorMessage, 
-          inputSuccessAction 
-        } = action.config;
+        // Используем ключи из формы: prompt, validationType, field
+        const { prompt, validationType, field } = action.config;
         
-        if (inputPrompt) {
-          addMessage(inputPrompt);
+        if (prompt) {
+          addMessage(prompt);
         }
         
         setState(prev => ({
           ...prev,
           isWaitingForInput: true,
           inputConfig: {
-            fieldName: inputFieldName || 'input',
-            inputType: inputType || 'text',
-            validationRegex: inputValidation,
-            errorMessage: inputErrorMessage || 'Неверный формат',
-            successAction: inputSuccessAction,
+            fieldName: field || 'input',
+            inputType: validationType || 'text',
+            errorMessage: 'Неверный формат',
           },
         }));
         
         // Симуляция ввода
         await delay(1500);
-        const simulatedValue = inputType === 'phone' ? '+7 999 000 00 00' : 
-                              inputType === 'email' ? 'test@test.com' : 
-                              inputType === 'number' ? '123' : 'Ответ пользователя';
+        const simulatedValue = validationType === 'phone' ? '+7 999 000 00 00' : 
+                              validationType === 'email' ? 'test@test.com' : 
+                              validationType === 'number' ? '123' : 'Ответ пользователя';
         
-        setVariable(inputFieldName || 'input', simulatedValue);
+        setVariable(field || 'input', simulatedValue);
         addMessage(simulatedValue, 'user');
         setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
         
-        return inputSuccessAction || null;
+        return null;
       }
 
       case 'send_notification': {
-        const { notificationMessage, notificationRecipient } = action.config;
-        addMessage(`🔔 Уведомление отправлено${notificationRecipient ? ` для ${notificationRecipient}` : ''}: "${notificationMessage || 'Уведомление'}"`);
+        // Используем ключи из формы: message, silent
+        const { message, silent } = action.config;
+        addMessage(`🔔 Уведомление${silent ? ' (тихо)' : ''}: "${message || 'Уведомление'}"`);
         return null;
       }
 
       case 'schedule_message': {
-        const { scheduleMessage, scheduleDelayMinutes, scheduleDateTime } = action.config;
-        const delayText = scheduleDateTime || `через ${scheduleDelayMinutes || 60} мин.`;
+        // Используем ключи из формы: delayMinutes, message
+        const { delayMinutes, message } = action.config;
         
         const scheduledId = crypto.randomUUID();
         setState(prev => ({
@@ -655,19 +678,19 @@ export function useActionExecutor(menus: BotMenu[]) {
             ...prev.scheduledMessages,
             {
               id: scheduledId,
-              text: scheduleMessage || 'Запланированное сообщение',
-              scheduledAt: new Date(Date.now() + (scheduleDelayMinutes || 60) * 60000),
+              text: message || 'Запланированное сообщение',
+              scheduledAt: new Date(Date.now() + (delayMinutes || 60) * 60000),
               executed: false,
             },
           ],
         }));
         
-        addMessage(`📅 Запланировано сообщение ${delayText}: "${scheduleMessage || 'Сообщение'}"`);
+        addMessage(`📅 Запланировано сообщение через ${delayMinutes || 60} мин.: "${message || 'Сообщение'}"`);
         
         // В превью показываем через 3 сек
         setTimeout(() => {
           if (!abortRef.current) {
-            addMessage(`📬 [Запланированное]: ${scheduleMessage || 'Сообщение'}`);
+            addMessage(`📬 [Запланированное]: ${message || 'Сообщение'}`);
           }
         }, 3000);
         
@@ -675,13 +698,15 @@ export function useActionExecutor(menus: BotMenu[]) {
       }
 
       case 'broadcast': {
-        const { broadcastMessage, broadcastFilter, broadcastTag } = action.config;
-        const filterText = broadcastFilter === 'tag' ? `с тегом "${broadcastTag}"` : 
-                          broadcastFilter === 'all' ? 'всем' : 
-                          broadcastFilter === 'active' ? 'активным' : 'всем';
+        // Используем ключи из формы: segment, tag, message
+        const { segment, tag, message } = action.config;
+        const filterText = segment === 'tag' ? `с тегом "${tag}"` : 
+                          segment === 'all' ? 'всем' : 
+                          segment === 'active' ? 'активным' : 
+                          segment === 'inactive' ? 'неактивным' : 'всем';
         
         addMessage(`📢 Рассылка ${filterText}:`);
-        addMessage(`"${broadcastMessage || 'Сообщение рассылки'}"`);
+        addMessage(`"${message || 'Сообщение рассылки'}"`);
         addMessage(`📊 Отправлено: ~1,234 пользователям`);
         
         return null;

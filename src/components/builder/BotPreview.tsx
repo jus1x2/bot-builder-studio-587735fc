@@ -480,6 +480,170 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
         }]);
         return getNextNode();
       }
+      case 'change_field': {
+        const field = actionNode.config.field || 'points';
+        const operation = actionNode.config.operation || 'add';
+        const amount = actionNode.config.amount || 0;
+        const opText = operation === 'add' ? '+' : operation === 'subtract' ? '-' : '=';
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `📊 Поле "${field}": ${opText}${amount}`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'add_tag': {
+        const tag = actionNode.config.tag || 'новый_тег';
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🏷️ Добавлен тег: ${tag}`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'remove_tag': {
+        const tag = actionNode.config.tag || 'тег';
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🏷️ Удалён тег: ${tag}`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'check_subscription': {
+        const channel = actionNode.config.channel || '@channel';
+        const isSubscribed = Math.random() > 0.5;
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `📢 Проверка подписки на ${channel}: ${isSubscribed ? '✅ Подписан' : '❌ Не подписан'}`, 
+          type: 'bot' 
+        }]);
+        
+        const outcomes = actionNode.outcomes || [];
+        const selectedOutcome = isSubscribed 
+          ? outcomes.find((o: any) => o.id === 'subscribed')
+          : outcomes.find((o: any) => o.id === 'not_subscribed');
+        
+        if (selectedOutcome?.targetId && selectedOutcome.targetType === 'menu') {
+          return { navigateMenuId: selectedOutcome.targetId };
+        } else if (selectedOutcome?.targetId && selectedOutcome.targetType === 'action') {
+          return { navigateMenuId: null, nextActionId: selectedOutcome.targetId };
+        }
+        return getNextNode();
+      }
+      case 'wait_response': {
+        const timeout = actionNode.config.timeout || 60;
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `⏳ Ожидание ответа (таймаут: ${timeout} сек)...`, 
+          type: 'bot' 
+        }]);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: 'Пример ответа пользователя', 
+          type: 'user' 
+        }]);
+        return getNextNode();
+      }
+      case 'keyword_trigger': {
+        const keywords = actionNode.config.keywords || ['старт', 'привет'];
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🔑 Ключевые слова: ${keywords.join(', ')}`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'no_response': {
+        const timeoutSec = actionNode.config.timeout || 30;
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `⏱️ Триггер "Нет ответа" (${timeoutSec} сек)`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'wrong_response': {
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `❌ Триггер "Неправильный ответ"`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'add_to_cart': {
+        const productId = actionNode.config.productId || 'product';
+        const quantity = actionNode.config.quantity || 1;
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🛒 Добавлено в корзину: товар (x${quantity})`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'show_cart': {
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🛒 Корзина:\n• Товар 1 — 500₽ x2\n• Товар 2 — 300₽ x1\n\n💰 Итого: 1300₽`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'clear_cart': {
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `🗑️ Корзина очищена`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
+      case 'process_payment': {
+        const amount = actionNode.config.amount || 0;
+        const currency = actionNode.config.currency || 'RUB';
+        const description = actionNode.config.description || 'Оплата';
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `💳 Оплата: ${description}\nСумма: ${amount} ${currency}`, 
+          type: 'bot' 
+        }]);
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const success = Math.random() > 0.3;
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: success ? '✅ Оплата прошла успешно!' : '❌ Ошибка оплаты', 
+          type: 'bot' 
+        }]);
+        
+        const outcomes = actionNode.outcomes || [];
+        const selectedOutcome = success 
+          ? outcomes.find((o: any) => o.id === 'success')
+          : outcomes.find((o: any) => o.id === 'failed');
+        
+        if (selectedOutcome?.targetId && selectedOutcome.targetType === 'menu') {
+          return { navigateMenuId: selectedOutcome.targetId };
+        } else if (selectedOutcome?.targetId && selectedOutcome.targetType === 'action') {
+          return { navigateMenuId: null, nextActionId: selectedOutcome.targetId };
+        }
+        return getNextNode();
+      }
+      case 'broadcast': {
+        const message = actionNode.config.message || 'Рассылка';
+        const targetTags = actionNode.config.targetTags || [];
+        const tagsText = targetTags.length > 0 ? ` (теги: ${targetTags.join(', ')})` : ' (все пользователи)';
+        
+        setActionMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          text: `📢 Рассылка${tagsText}:\n${interpolateVariables(message, userContext)}`, 
+          type: 'bot' 
+        }]);
+        return getNextNode();
+      }
     }
     return { navigateMenuId: null };
   }, [userContext]);

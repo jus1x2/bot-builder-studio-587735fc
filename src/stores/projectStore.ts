@@ -311,6 +311,15 @@ export const useProjectStore = create<ProjectStore>()(
               : p
           ),
         }));
+
+        // Sync to cloud after menu update (debounced via autoSave, but also trigger manual sync for position changes)
+        const { profileId } = get();
+        if (profileId && updates.position) {
+          // Debounce position updates to avoid too many saves during drag
+          setTimeout(() => {
+            get().syncProjectToCloud(project.id);
+          }, 500);
+        }
       },
 
       deleteMenu: (menuId) => {
@@ -789,6 +798,14 @@ export const useProjectStore = create<ProjectStore>()(
               : p
           ),
         }));
+
+        // Sync to cloud after action node update (for position changes)
+        const { profileId } = get();
+        if (profileId && updates.position) {
+          setTimeout(() => {
+            get().syncProjectToCloud(project.id);
+          }, 500);
+        }
       },
 
       deleteActionNode: (actionNodeId) => {

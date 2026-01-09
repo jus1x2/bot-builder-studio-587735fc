@@ -967,6 +967,18 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
       return (
         <div className="space-y-4">
           <ConfigField
+            label="Тип ожидаемого ответа"
+            description="Какой формат данных нужно получить"
+            tip="Выберите тип для автоматической проверки правильности ввода"
+          >
+            <ConfigSelect
+              value={config.validationType || 'text'}
+              onChange={(v) => updateConfig('validationType', v)}
+              options={VALIDATION_TYPE_OPTIONS}
+            />
+          </ConfigField>
+
+          <ConfigField
             label="Сколько ждать ответ"
             description="Максимальное время ожидания"
             tip="0 = ждать бесконечно. Для опросов рекомендуем 60-300 секунд"
@@ -999,33 +1011,102 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
             />
           </ConfigField>
 
-          <ConfigField
-            label="Если не ответил вовремя"
-            description="Что делать когда время вышло"
-          >
-            <ConfigSelect
-              value={config.timeoutAction || 'none'}
-              onChange={(v) => updateConfig('timeoutAction', v)}
-              options={TIMEOUT_ACTION_OPTIONS}
-            />
-          </ConfigField>
+          <ConfigGroup title="При правильном ответе" description="Что делать когда ввод прошёл валидацию">
+            <ConfigField
+              label="Сообщение успеха"
+              description="Показать это сообщение (необязательно)"
+            >
+              <ConfigTextInput
+                value={config.successMessage || ''}
+                onChange={(v) => updateConfig('successMessage', v)}
+                placeholder="✅ Отлично! Данные сохранены"
+              />
+            </ConfigField>
 
-          {config.timeoutAction === 'menu' && (
             <ConfigField
               label="Перейти к экрану"
-              description="Какой экран показать при истечении времени"
+              description="Куда перенаправить пользователя"
             >
               <ConfigSelect
-                value={config.timeoutMenuId || ''}
-                onChange={(v) => updateConfig('timeoutMenuId', v)}
+                value={config.successMenuId || ''}
+                onChange={(v) => updateConfig('successMenuId', v)}
                 options={menuOptions}
                 placeholder="Выберите экран..."
               />
             </ConfigField>
-          )}
+          </ConfigGroup>
+
+          <ConfigGroup title="При неправильном ответе" description="Что делать когда ввод не прошёл валидацию">
+            <ConfigField
+              label="Сообщение об ошибке"
+              description="Объяснить что пошло не так"
+            >
+              <ConfigTextInput
+                value={config.errorMessage || ''}
+                onChange={(v) => updateConfig('errorMessage', v)}
+                placeholder="❌ Неверный формат. Попробуйте ещё раз"
+              />
+            </ConfigField>
+
+            <ConfigField
+              label="Максимум попыток"
+              description="Сколько раз можно ошибиться (0 = бесконечно)"
+            >
+              <ConfigNumber
+                value={config.maxRetries || 3}
+                onChange={(v) => updateConfig('maxRetries', v)}
+                min={0}
+                max={10}
+                presets={[
+                  { value: 0, label: 'Бесконечно' },
+                  { value: 3, label: '3 попытки' },
+                  { value: 5, label: '5 попыток' },
+                ]}
+              />
+            </ConfigField>
+
+            <ConfigField
+              label="После всех попыток"
+              description="Куда перейти если лимит исчерпан"
+            >
+              <ConfigSelect
+                value={config.errorMenuId || ''}
+                onChange={(v) => updateConfig('errorMenuId', v)}
+                options={menuOptions}
+                placeholder="Выберите экран..."
+              />
+            </ConfigField>
+          </ConfigGroup>
+
+          <ConfigGroup title="Если не ответил" description="Что делать при истечении времени">
+            <ConfigField
+              label="Действие при таймауте"
+              description="Что делать когда время вышло"
+            >
+              <ConfigSelect
+                value={config.timeoutAction || 'none'}
+                onChange={(v) => updateConfig('timeoutAction', v)}
+                options={TIMEOUT_ACTION_OPTIONS}
+              />
+            </ConfigField>
+
+            {config.timeoutAction === 'menu' && (
+              <ConfigField
+                label="Перейти к экрану"
+                description="Какой экран показать при истечении времени"
+              >
+                <ConfigSelect
+                  value={config.timeoutMenuId || ''}
+                  onChange={(v) => updateConfig('timeoutMenuId', v)}
+                  options={menuOptions}
+                  placeholder="Выберите экран..."
+                />
+              </ConfigField>
+            )}
+          </ConfigGroup>
 
           <ConfigInfo type="tip">
-            Ждать ответ полезно для опросов, сбора контактов и обратной связи.
+            Используйте валидацию для сбора email, телефонов и чисел. Неправильные ответы будут отклоняться автоматически.
           </ConfigInfo>
         </div>
       );

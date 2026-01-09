@@ -484,13 +484,19 @@ export function useActionExecutor(menus: BotMenu[]) {
       }
 
       case 'wait_response': {
-        // Используем ключи из формы: timeout, saveToField, timeoutAction, timeoutMenuId, validationType
+        // Расширенные ключи: timeout, saveToField, timeoutAction, timeoutMenuId, validationType
+        // successMessage, successMenuId, errorMessage, errorMenuId, maxRetries
         const { 
           timeout, 
           saveToField, 
           timeoutAction, 
           timeoutMenuId,
-          validationType
+          validationType,
+          successMessage,
+          successMenuId,
+          errorMessage,
+          errorMenuId,
+          maxRetries
         } = action.config;
         
         setState(prev => ({
@@ -499,7 +505,8 @@ export function useActionExecutor(menus: BotMenu[]) {
           inputConfig: {
             fieldName: saveToField || 'response',
             inputType: validationType || 'text',
-            errorMessage: 'Неверный формат ввода',
+            errorMessage: errorMessage || 'Неверный формат ввода',
+            successAction: successMenuId,
             timeoutSeconds: timeout,
             timeoutAction: timeoutAction,
           },
@@ -510,15 +517,49 @@ export function useActionExecutor(menus: BotMenu[]) {
                                validationType === 'number' ? 'числа' : 'ответа';
         addMessage(`⏳ Ожидание ${inputTypeLabel}...`);
         
-        // В превью симулируем ввод через 2 секунды
+        // В превью симулируем ввод и проверку валидации
         await delay(2000);
-        const simulatedInput = validationType === 'phone' ? '+7 999 123 45 67' : 
-                               validationType === 'email' ? 'user@example.com' : 
-                               validationType === 'number' ? '42' : 'Да';
         
-        setVariable(saveToField || 'response', simulatedInput);
-        addMessage(simulatedInput, 'user');
-        setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
+        // Симулируем ввод с проверкой валидации
+        const isValidInput = Math.random() > 0.3; // 70% шанс правильного ввода для демо
+        
+        if (isValidInput) {
+          // Правильный ввод
+          const simulatedInput = validationType === 'phone' ? '+7 999 123 45 67' : 
+                                 validationType === 'email' ? 'user@example.com' : 
+                                 validationType === 'number' ? '42' : 'Да';
+          
+          setVariable(saveToField || 'response', simulatedInput);
+          addMessage(simulatedInput, 'user');
+          
+          if (successMessage) {
+            addMessage(successMessage);
+          }
+          
+          setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
+          
+          // Переход к экрану успеха
+          if (successMenuId) {
+            return successMenuId;
+          }
+        } else {
+          // Неправильный ввод - симуляция
+          const badInput = validationType === 'phone' ? 'abc123' : 
+                           validationType === 'email' ? 'not-email' : 
+                           validationType === 'number' ? 'текст' : '';
+          
+          addMessage(badInput || '(пустой ответ)', 'user');
+          addMessage(errorMessage || '❌ Неверный формат. Попробуйте ещё раз');
+          
+          // В реальном боте здесь будет цикл повторов
+          // Для превью просто переходим к меню ошибки если установлено
+          setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
+          
+          if (errorMenuId) {
+            addMessage(`⚠️ Исчерпаны попытки (макс: ${maxRetries || 3})`);
+            return errorMenuId;
+          }
+        }
         
         // Если есть timeoutAction === 'menu', вернуть timeoutMenuId
         if (timeoutAction === 'menu' && timeoutMenuId) {

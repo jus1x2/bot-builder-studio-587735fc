@@ -671,8 +671,21 @@ export function useActionExecutor(menus: BotMenu[]) {
       }
 
       case 'request_input': {
-        // Используем ключи из формы: prompt, validationType, field
-        const { prompt, validationType, field } = action.config;
+        // Расширенные ключи: prompt, validationType, field, timeout, timeoutAction, timeoutMenuId
+        // successMessage, successMenuId, errorMessage, errorMenuId, maxRetries
+        const { 
+          prompt, 
+          validationType, 
+          field,
+          timeout,
+          timeoutAction,
+          timeoutMenuId,
+          successMessage,
+          successMenuId,
+          errorMessage,
+          errorMenuId,
+          maxRetries
+        } = action.config;
         
         if (prompt) {
           addMessage(prompt);
@@ -684,20 +697,66 @@ export function useActionExecutor(menus: BotMenu[]) {
           inputConfig: {
             fieldName: field || 'input',
             inputType: validationType || 'text',
-            errorMessage: 'Неверный формат',
+            errorMessage: errorMessage || 'Неверный формат ввода',
+            successAction: successMenuId,
+            timeoutSeconds: timeout,
+            timeoutAction: timeoutAction,
           },
         }));
         
-        // Симуляция ввода
-        await delay(1500);
-        const simulatedValue = validationType === 'phone' ? '+7 999 000 00 00' : 
-                              validationType === 'email' ? 'test@test.com' : 
-                              validationType === 'number' ? '123' : 'Ответ пользователя';
+        const inputTypeLabel = validationType === 'phone' ? 'телефона' : 
+                               validationType === 'email' ? 'email' : 
+                               validationType === 'number' ? 'числа' : 'ответа';
+        addMessage(`⏳ Ожидание ${inputTypeLabel}...`);
         
-        setVariable(field || 'input', simulatedValue);
-        addMessage(simulatedValue, 'user');
-        setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
+        // В превью симулируем ввод и проверку валидации
+        await delay(2000);
         
+        // Симулируем ввод с проверкой валидации
+        const isValidInput = Math.random() > 0.3; // 70% шанс правильного ввода для демо
+        
+        if (isValidInput) {
+          // Правильный ввод
+          const simulatedInput = validationType === 'phone' ? '+7 999 000 00 00' : 
+                                 validationType === 'email' ? 'test@test.com' : 
+                                 validationType === 'number' ? '123' : 'Ответ пользователя';
+          
+          setVariable(field || 'input', simulatedInput);
+          addMessage(simulatedInput, 'user');
+          
+          if (successMessage) {
+            addMessage(successMessage);
+          }
+          
+          setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
+          
+          // Переход к экрану успеха
+          if (successMenuId) {
+            return successMenuId;
+          }
+        } else {
+          // Неправильный ввод - симуляция
+          const badInput = validationType === 'phone' ? 'abc123' : 
+                           validationType === 'email' ? 'not-email' : 
+                           validationType === 'number' ? 'текст' : '';
+          
+          addMessage(badInput || '(пустой ответ)', 'user');
+          addMessage(errorMessage || '❌ Неверный формат. Попробуйте ещё раз');
+          
+          // В реальном боте здесь будет цикл повторов
+          // Для превью просто переходим к меню ошибки если установлено
+          setState(prev => ({ ...prev, isWaitingForInput: false, inputConfig: undefined }));
+          
+          if (errorMenuId) {
+            addMessage(`⚠️ Исчерпаны попытки (макс: ${maxRetries || 3})`);
+            return errorMenuId;
+          }
+        }
+        
+        // Если есть timeoutAction === 'menu', вернуть timeoutMenuId
+        if (timeoutAction === 'menu' && timeoutMenuId) {
+          return timeoutMenuId;
+        }
         return null;
       }
 

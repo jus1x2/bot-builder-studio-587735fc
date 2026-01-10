@@ -786,6 +786,10 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
     case 'request_input':
       return (
         <div className="space-y-4">
+          <ConfigInfo type="info">
+            Спросите у пользователя данные и проверьте правильность ввода. Настройте реакцию на правильный и неправильный ответ.
+          </ConfigInfo>
+
           <ConfigField
             label="Вопрос пользователю"
             description="Что спросить у пользователя"
@@ -802,8 +806,8 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
           </ConfigField>
 
           <ConfigField
-            label="Тип ответа"
-            description="Какой формат ожидается"
+            label="Тип валидации"
+            description="Какой формат ответа ожидается"
           >
             <ConfigSelect
               value={config.validationType || 'text'}
@@ -823,6 +827,122 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
               placeholder="user.name"
             />
           </ConfigField>
+
+          <ConfigField
+            label="Таймаут ожидания (сек)"
+            description="Сколько секунд ждать ответа (0 = бесконечно)"
+          >
+            <ConfigNumber
+              value={config.timeout || 0}
+              onChange={(v) => updateConfig('timeout', v)}
+              min={0}
+              max={3600}
+              presets={[
+                { value: 0, label: 'Бесконечно' },
+                { value: 30, label: '30 сек' },
+                { value: 60, label: '1 мин' },
+                { value: 300, label: '5 мин' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigGroup title="При правильном ответе" description="Что делать когда ввод прошёл валидацию">
+            <ConfigField
+              label="Сообщение об успехе"
+              description="Подтвердить что ответ принят"
+            >
+              <ConfigTextInput
+                value={config.successMessage || ''}
+                onChange={(v) => updateConfig('successMessage', v)}
+                placeholder="✅ Отлично, данные сохранены!"
+              />
+            </ConfigField>
+
+            <ConfigField
+              label="Перейти к экрану"
+              description="Куда перенаправить после успешного ввода"
+            >
+              <ConfigSelect
+                value={config.successMenuId || ''}
+                onChange={(v) => updateConfig('successMenuId', v)}
+                options={menuOptions}
+                placeholder="Выберите экран..."
+              />
+            </ConfigField>
+          </ConfigGroup>
+
+          <ConfigGroup title="При неправильном ответе" description="Что делать когда ввод не прошёл валидацию">
+            <ConfigField
+              label="Сообщение об ошибке"
+              description="Объяснить что пошло не так"
+            >
+              <ConfigTextInput
+                value={config.errorMessage || ''}
+                onChange={(v) => updateConfig('errorMessage', v)}
+                placeholder="❌ Неверный формат. Попробуйте ещё раз"
+              />
+            </ConfigField>
+
+            <ConfigField
+              label="Максимум попыток"
+              description="Сколько раз можно ошибиться (0 = бесконечно)"
+            >
+              <ConfigNumber
+                value={config.maxRetries || 3}
+                onChange={(v) => updateConfig('maxRetries', v)}
+                min={0}
+                max={10}
+                presets={[
+                  { value: 0, label: 'Бесконечно' },
+                  { value: 3, label: '3 попытки' },
+                  { value: 5, label: '5 попыток' },
+                ]}
+              />
+            </ConfigField>
+
+            <ConfigField
+              label="После всех попыток"
+              description="Куда перейти если лимит исчерпан"
+            >
+              <ConfigSelect
+                value={config.errorMenuId || ''}
+                onChange={(v) => updateConfig('errorMenuId', v)}
+                options={menuOptions}
+                placeholder="Выберите экран..."
+              />
+            </ConfigField>
+          </ConfigGroup>
+
+          <ConfigGroup title="Если не ответил" description="Что делать при истечении времени">
+            <ConfigField
+              label="Действие при таймауте"
+              description="Что делать когда время вышло"
+            >
+              <ConfigSelect
+                value={config.timeoutAction || 'none'}
+                onChange={(v) => updateConfig('timeoutAction', v)}
+                options={TIMEOUT_ACTION_OPTIONS}
+              />
+            </ConfigField>
+
+            {config.timeoutAction === 'menu' && (
+              <ConfigField
+                label="Перейти к экрану"
+                description="Какой экран показать при истечении времени"
+              >
+                <ConfigSelect
+                  value={config.timeoutMenuId || ''}
+                  onChange={(v) => updateConfig('timeoutMenuId', v)}
+                  options={menuOptions}
+                  placeholder="Выберите экран..."
+                />
+              </ConfigField>
+            )}
+          </ConfigGroup>
+
+          <ConfigInfo type="tip">
+            Используйте валидацию для сбора email, телефонов и чисел. Неправильные ответы будут отклоняться автоматически.
+          </ConfigInfo>
         </div>
       );
 

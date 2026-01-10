@@ -1,8 +1,138 @@
 import { useState, useEffect, forwardRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, MoreVertical, Send, RotateCcw } from 'lucide-react';
+import { ChevronLeft, MoreVertical, Send, RotateCcw, ArrowRight, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { BotMenu, BotButton, BotActionNode } from '@/types/bot';
 import { interpolateVariables, UserContext } from '@/hooks/useActionExecutor';
+
+// Flow preview component for wait_response and request_input actions
+interface FlowBranch {
+  type: 'success' | 'error' | 'timeout';
+  label: string;
+  menuId?: string;
+  menuName?: string;
+  message?: string;
+}
+
+interface FlowPreviewProps {
+  actionType: 'wait_response' | 'request_input';
+  config: any;
+  menus: BotMenu[];
+}
+
+function FlowPreview({ actionType, config, menus }: FlowPreviewProps) {
+  const branches: FlowBranch[] = [];
+  
+  // Success branch
+  if (config.successMenuId || config.successMessage) {
+    const successMenu = menus.find(m => m.id === config.successMenuId);
+    branches.push({
+      type: 'success',
+      label: 'Верный ответ',
+      menuId: config.successMenuId,
+      menuName: successMenu?.name,
+      message: config.successMessage
+    });
+  }
+  
+  // Error branch
+  if (config.errorMenuId || config.errorMessage) {
+    const errorMenu = menus.find(m => m.id === config.errorMenuId);
+    branches.push({
+      type: 'error',
+      label: `Неверный ответ (${config.maxRetries || 3} попыток)`,
+      menuId: config.errorMenuId,
+      menuName: errorMenu?.name,
+      message: config.errorMessage
+    });
+  }
+  
+  // Timeout branch
+  if (config.timeoutMenuId || config.timeoutAction) {
+    const timeoutMenu = menus.find(m => m.id === config.timeoutMenuId);
+    branches.push({
+      type: 'timeout',
+      label: `Таймаут (${config.timeout || 60} сек)`,
+      menuId: config.timeoutMenuId,
+      menuName: timeoutMenu?.name,
+      message: config.timeoutAction === 'retry' ? 'Повтор вопроса' : 
+               config.timeoutAction === 'skip' ? 'Пропуск' : undefined
+    });
+  }
+  
+  if (branches.length === 0) return null;
+  
+  const getIcon = (type: FlowBranch['type']) => {
+    switch (type) {
+      case 'success': return <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />;
+      case 'error': return <XCircle className="w-3.5 h-3.5 text-red-500" />;
+      case 'timeout': return <Clock className="w-3.5 h-3.5 text-amber-500" />;
+    }
+  };
+  
+  const getBgColor = (type: FlowBranch['type']) => {
+    switch (type) {
+      case 'success': return 'bg-green-500/10 border-green-500/30';
+      case 'error': return 'bg-red-500/10 border-red-500/30';
+      case 'timeout': return 'bg-amber-500/10 border-amber-500/30';
+    }
+  };
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-full mt-2"
+    >
+      <div className="bg-muted/50 rounded-xl p-3 border border-border/50">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+            <span className="text-[10px] font-semibold text-primary">?</span>
+          </div>
+          <span className="text-xs font-medium text-foreground">
+            {actionType === 'wait_response' ? 'Ожидание ответа' : 'Запрос ввода'}
+          </span>
+          {config.validationType && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+              {config.validationType === 'email' ? 'Email' : 
+               config.validationType === 'phone' ? 'Телефон' :
+               config.validationType === 'number' ? 'Число' : 'Текст'}
+            </span>
+          )}
+        </div>
+        
+        <div className="space-y-1.5">
+          {branches.map((branch, idx) => (
+            <motion.div
+              key={branch.type}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              className={`flex items-center gap-2 p-2 rounded-lg border ${getBgColor(branch.type)}`}
+            >
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                {getIcon(branch.type)}
+                <span className="text-[11px] text-foreground/80 truncate">{branch.label}</span>
+              </div>
+              <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+              <div className="text-[11px] text-foreground font-medium truncate max-w-[100px]">
+                {branch.menuName ? (
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    {branch.menuName}
+                  </span>
+                ) : branch.message ? (
+                  <span className="text-muted-foreground italic">{branch.message}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 // Simple Telegram-style markdown parser
 function parseMarkdown(text: string): React.ReactNode[] {
@@ -299,13 +429,63 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
           text: interpolateVariables(promptText, userContext), 
           type: 'bot' 
         }]);
-        // Simulate user response
+        
+        // Show flow preview for request_input
+        const hasFlowConfig = actionNode.config.successMenuId || actionNode.config.errorMenuId || actionNode.config.timeoutMenuId;
+        if (hasFlowConfig) {
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: `__FLOW_PREVIEW__:request_input:${JSON.stringify(actionNode.config)}`, 
+            type: 'bot' 
+          }]);
+        }
+        
+        // Simulate user response with validation
         await new Promise(resolve => setTimeout(resolve, 500));
+        const validationType = actionNode.config.validationType || 'text';
+        const isValid = Math.random() > 0.3; // 70% chance of valid input
+        
+        const sampleInputs: Record<string, { valid: string; invalid: string }> = {
+          text: { valid: 'Пример ответа', invalid: '' },
+          email: { valid: 'user@example.com', invalid: 'неправильный-email' },
+          phone: { valid: '+7 999 123-45-67', invalid: 'не телефон' },
+          number: { valid: '42', invalid: 'не число' }
+        };
+        
+        const input = sampleInputs[validationType] || sampleInputs.text;
+        const userInput = isValid ? input.valid : input.invalid;
+        
         setActionMessages(prev => [...prev, { 
           id: crypto.randomUUID(), 
-          text: 'Пример ответа', 
+          text: userInput, 
           type: 'user' 
         }]);
+        
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        if (isValid) {
+          if (actionNode.config.successMessage) {
+            setActionMessages(prev => [...prev, { 
+              id: crypto.randomUUID(), 
+              text: `✅ ${actionNode.config.successMessage}`, 
+              type: 'bot' 
+            }]);
+          }
+          if (actionNode.config.successMenuId) {
+            return { navigateMenuId: actionNode.config.successMenuId };
+          }
+        } else {
+          if (actionNode.config.errorMessage) {
+            setActionMessages(prev => [...prev, { 
+              id: crypto.randomUUID(), 
+              text: `❌ ${actionNode.config.errorMessage}`, 
+              type: 'bot' 
+            }]);
+          }
+          if (actionNode.config.errorMenuId) {
+            return { navigateMenuId: actionNode.config.errorMenuId };
+          }
+        }
         break;
       }
       case 'quiz': {
@@ -540,12 +720,85 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
           text: `⏳ Ожидание ответа (таймаут: ${timeout} сек)...`, 
           type: 'bot' 
         }]);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setActionMessages(prev => [...prev, { 
-          id: crypto.randomUUID(), 
-          text: 'Пример ответа пользователя', 
-          type: 'user' 
-        }]);
+        
+        // Show flow preview for wait_response
+        const hasFlowConfig = actionNode.config.successMenuId || actionNode.config.errorMenuId || actionNode.config.timeoutMenuId;
+        if (hasFlowConfig) {
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: `__FLOW_PREVIEW__:wait_response:${JSON.stringify(actionNode.config)}`, 
+            type: 'bot' 
+          }]);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Simulate different outcomes based on probability
+        const outcome = Math.random();
+        const validationType = actionNode.config.validationType || 'text';
+        
+        if (outcome < 0.6) {
+          // 60% - valid response
+          const sampleValidInputs: Record<string, string> = {
+            text: 'Правильный ответ',
+            email: 'user@example.com',
+            phone: '+7 999 123-45-67',
+            number: '100'
+          };
+          
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: sampleValidInputs[validationType] || 'Правильный ответ', 
+            type: 'user' 
+          }]);
+          
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          if (actionNode.config.successMessage) {
+            setActionMessages(prev => [...prev, { 
+              id: crypto.randomUUID(), 
+              text: `✅ ${actionNode.config.successMessage}`, 
+              type: 'bot' 
+            }]);
+          }
+          
+          if (actionNode.config.successMenuId) {
+            return { navigateMenuId: actionNode.config.successMenuId };
+          }
+        } else if (outcome < 0.85) {
+          // 25% - invalid response
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: 'Неправильный ответ', 
+            type: 'user' 
+          }]);
+          
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          if (actionNode.config.errorMessage) {
+            setActionMessages(prev => [...prev, { 
+              id: crypto.randomUUID(), 
+              text: `❌ ${actionNode.config.errorMessage}`, 
+              type: 'bot' 
+            }]);
+          }
+          
+          if (actionNode.config.errorMenuId) {
+            return { navigateMenuId: actionNode.config.errorMenuId };
+          }
+        } else {
+          // 15% - timeout
+          setActionMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            text: `⏱️ Время ожидания истекло`, 
+            type: 'bot' 
+          }]);
+          
+          if (actionNode.config.timeoutMenuId) {
+            return { navigateMenuId: actionNode.config.timeoutMenuId };
+          }
+        }
+        
         return getNextNode();
       }
       case 'keyword_trigger': {
@@ -865,14 +1118,49 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
             </motion.div>
 
             <AnimatePresence>
-              {actionMessages.map((msg, index) => (
-                <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: index * 0.05 }} className="max-w-[85%]">
-                  <div className="bg-card rounded-2xl rounded-tl-md px-4 py-3 shadow-sm">
-                    <div className="text-sm text-foreground">{parseMarkdown(msg.text)}</div>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-1 ml-2">{new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</p>
-                </motion.div>
-              ))}
+              {actionMessages.map((msg, index) => {
+                // Check if this is a flow preview message
+                if (msg.text.startsWith('__FLOW_PREVIEW__:')) {
+                  const parts = msg.text.split(':');
+                  const actionType = parts[1] as 'wait_response' | 'request_input';
+                  const configJson = parts.slice(2).join(':');
+                  try {
+                    const config = JSON.parse(configJson);
+                    return (
+                      <FlowPreview 
+                        key={msg.id}
+                        actionType={actionType}
+                        config={config}
+                        menus={menus}
+                      />
+                    );
+                  } catch {
+                    return null;
+                  }
+                }
+                
+                return (
+                  <motion.div 
+                    key={msg.id} 
+                    initial={{ opacity: 0, y: 10 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    exit={{ opacity: 0 }} 
+                    transition={{ delay: index * 0.05 }} 
+                    className={`max-w-[85%] ${msg.type === 'user' ? 'ml-auto' : ''}`}
+                  >
+                    <div className={`rounded-2xl px-4 py-3 shadow-sm ${
+                      msg.type === 'user' 
+                        ? 'bg-primary text-primary-foreground rounded-tr-md' 
+                        : 'bg-card rounded-tl-md'
+                    }`}>
+                      <div className="text-sm">{parseMarkdown(msg.text)}</div>
+                    </div>
+                    <p className={`text-[10px] text-muted-foreground mt-1 ${msg.type === 'user' ? 'mr-2 text-right' : 'ml-2'}`}>
+                      {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
 
             <AnimatePresence>{isTypingIndicator && <TypingIndicator />}</AnimatePresence>

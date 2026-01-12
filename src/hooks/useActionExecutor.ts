@@ -485,7 +485,7 @@ export function useActionExecutor(menus: BotMenu[]) {
 
       case 'wait_response': {
         // Расширенные ключи: timeout, saveToField, timeoutAction, timeoutMenuId, validationType
-        // successMessage, successMenuId, errorMessage, errorMenuId, maxRetries
+        // successMessage, successMenuId, errorMessage, errorMenuId, maxRetries, customRegex, regexExample
         const { 
           timeout, 
           saveToField, 
@@ -496,7 +496,9 @@ export function useActionExecutor(menus: BotMenu[]) {
           successMenuId,
           errorMessage,
           errorMenuId,
-          maxRetries
+          maxRetries,
+          customRegex,
+          regexExample
         } = action.config;
         
         setState(prev => ({
@@ -505,6 +507,7 @@ export function useActionExecutor(menus: BotMenu[]) {
           inputConfig: {
             fieldName: saveToField || 'response',
             inputType: validationType || 'text',
+            validationRegex: validationType === 'custom' ? customRegex : undefined,
             errorMessage: errorMessage || 'Неверный формат ввода',
             successAction: successMenuId,
             timeoutSeconds: timeout,
@@ -514,7 +517,8 @@ export function useActionExecutor(menus: BotMenu[]) {
         
         const inputTypeLabel = validationType === 'phone' ? 'телефона' : 
                                validationType === 'email' ? 'email' : 
-                               validationType === 'number' ? 'числа' : 'ответа';
+                               validationType === 'number' ? 'числа' : 
+                               validationType === 'custom' ? `формата ${regexExample || 'regex'}` : 'ответа';
         addMessage(`⏳ Ожидание ${inputTypeLabel}...`);
         
         // В превью симулируем ввод и проверку валидации
@@ -527,7 +531,8 @@ export function useActionExecutor(menus: BotMenu[]) {
           // Правильный ввод
           const simulatedInput = validationType === 'phone' ? '+7 999 123 45 67' : 
                                  validationType === 'email' ? 'user@example.com' : 
-                                 validationType === 'number' ? '42' : 'Да';
+                                 validationType === 'number' ? '42' : 
+                                 validationType === 'custom' ? (regexExample || 'AB123456') : 'Да';
           
           setVariable(saveToField || 'response', simulatedInput);
           addMessage(simulatedInput, 'user');
@@ -546,7 +551,8 @@ export function useActionExecutor(menus: BotMenu[]) {
           // Неправильный ввод - симуляция
           const badInput = validationType === 'phone' ? 'abc123' : 
                            validationType === 'email' ? 'not-email' : 
-                           validationType === 'number' ? 'текст' : '';
+                           validationType === 'number' ? 'текст' : 
+                           validationType === 'custom' ? 'неверный_формат' : '';
           
           addMessage(badInput || '(пустой ответ)', 'user');
           addMessage(errorMessage || '❌ Неверный формат. Попробуйте ещё раз');
@@ -672,7 +678,7 @@ export function useActionExecutor(menus: BotMenu[]) {
 
       case 'request_input': {
         // Расширенные ключи: prompt, validationType, field, timeout, timeoutAction, timeoutMenuId
-        // successMessage, successMenuId, errorMessage, errorMenuId, maxRetries
+        // successMessage, successMenuId, errorMessage, errorMenuId, maxRetries, customRegex, regexExample
         const { 
           prompt, 
           validationType, 
@@ -684,7 +690,9 @@ export function useActionExecutor(menus: BotMenu[]) {
           successMenuId,
           errorMessage,
           errorMenuId,
-          maxRetries
+          maxRetries,
+          customRegex,
+          regexExample
         } = action.config;
         
         if (prompt) {
@@ -697,6 +705,7 @@ export function useActionExecutor(menus: BotMenu[]) {
           inputConfig: {
             fieldName: field || 'input',
             inputType: validationType || 'text',
+            validationRegex: validationType === 'custom' ? customRegex : undefined,
             errorMessage: errorMessage || 'Неверный формат ввода',
             successAction: successMenuId,
             timeoutSeconds: timeout,
@@ -706,7 +715,8 @@ export function useActionExecutor(menus: BotMenu[]) {
         
         const inputTypeLabel = validationType === 'phone' ? 'телефона' : 
                                validationType === 'email' ? 'email' : 
-                               validationType === 'number' ? 'числа' : 'ответа';
+                               validationType === 'number' ? 'числа' : 
+                               validationType === 'custom' ? `формата ${regexExample || 'regex'}` : 'ответа';
         addMessage(`⏳ Ожидание ${inputTypeLabel}...`);
         
         // В превью симулируем ввод и проверку валидации
@@ -719,7 +729,8 @@ export function useActionExecutor(menus: BotMenu[]) {
           // Правильный ввод
           const simulatedInput = validationType === 'phone' ? '+7 999 000 00 00' : 
                                  validationType === 'email' ? 'test@test.com' : 
-                                 validationType === 'number' ? '123' : 'Ответ пользователя';
+                                 validationType === 'number' ? '123' : 
+                                 validationType === 'custom' ? (regexExample || 'AB123456') : 'Ответ пользователя';
           
           setVariable(field || 'input', simulatedInput);
           addMessage(simulatedInput, 'user');
@@ -738,7 +749,8 @@ export function useActionExecutor(menus: BotMenu[]) {
           // Неправильный ввод - симуляция
           const badInput = validationType === 'phone' ? 'abc123' : 
                            validationType === 'email' ? 'not-email' : 
-                           validationType === 'number' ? 'текст' : '';
+                           validationType === 'number' ? 'текст' : 
+                           validationType === 'custom' ? 'неверный_формат' : '';
           
           addMessage(badInput || '(пустой ответ)', 'user');
           addMessage(errorMessage || '❌ Неверный формат. Попробуйте ещё раз');

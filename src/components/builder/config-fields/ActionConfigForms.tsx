@@ -411,6 +411,7 @@ export const VALIDATION_TYPE_OPTIONS: SelectOption[] = [
   { value: 'number', label: 'Только числа', description: '123, 45.67' },
   { value: 'email', label: 'Email', description: 'example@mail.com' },
   { value: 'phone', label: 'Телефон', description: '+7 999 123-45-67' },
+  { value: 'custom', label: 'Регулярное выражение', description: 'Своё правило проверки' },
 ];
 
 // Валидаторы
@@ -816,6 +817,35 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
             />
           </ConfigField>
 
+          {config.validationType === 'custom' && (
+            <>
+              <ConfigField
+                label="Регулярное выражение"
+                description="Паттерн для проверки ответа"
+                example="^\d{4}-\d{2}-\d{2}$"
+                tip="Используйте regex для проверки форматов: дата, номер заказа, код и т.д."
+                required
+              >
+                <ConfigTextInput
+                  value={config.customRegex || ''}
+                  onChange={(v) => updateConfig('customRegex', v)}
+                  placeholder="^[A-Z]{2}\d{6}$"
+                />
+              </ConfigField>
+
+              <ConfigField
+                label="Пример правильного ввода"
+                description="Покажите пользователю пример правильного формата"
+              >
+                <ConfigTextInput
+                  value={config.regexExample || ''}
+                  onChange={(v) => updateConfig('regexExample', v)}
+                  placeholder="AB123456"
+                />
+              </ConfigField>
+            </>
+          )}
+
           <ConfigField
             label="Куда сохранить ответ"
             description="Название для хранения ответа"
@@ -1097,6 +1127,35 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
               options={VALIDATION_TYPE_OPTIONS}
             />
           </ConfigField>
+
+          {config.validationType === 'custom' && (
+            <>
+              <ConfigField
+                label="Регулярное выражение"
+                description="Паттерн для проверки ответа"
+                example="^\d{4}-\d{2}-\d{2}$"
+                tip="Используйте regex для проверки форматов: дата, номер заказа, код и т.д."
+                required
+              >
+                <ConfigTextInput
+                  value={config.customRegex || ''}
+                  onChange={(v) => updateConfig('customRegex', v)}
+                  placeholder="^[A-Z]{2}\d{6}$"
+                />
+              </ConfigField>
+
+              <ConfigField
+                label="Пример правильного ввода"
+                description="Покажите пользователю пример правильного формата"
+              >
+                <ConfigTextInput
+                  value={config.regexExample || ''}
+                  onChange={(v) => updateConfig('regexExample', v)}
+                  placeholder="AB123456"
+                />
+              </ConfigField>
+            </>
+          )}
 
           <ConfigField
             label="Сколько ждать ответ"

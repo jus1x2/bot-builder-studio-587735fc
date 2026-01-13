@@ -1,8 +1,148 @@
-import { useState, useEffect, forwardRef, useCallback } from 'react';
+import { useState, useEffect, forwardRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, MoreVertical, Send, RotateCcw, ArrowRight, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ChevronLeft, MoreVertical, Send, RotateCcw, ArrowRight, CheckCircle2, XCircle, Clock, PlayCircle, Type } from 'lucide-react';
 import { BotMenu, BotButton, BotActionNode } from '@/types/bot';
 import { interpolateVariables, UserContext } from '@/hooks/useActionExecutor';
+import { Input } from '@/components/ui/input';
+
+// Validation regex patterns
+const VALIDATION_PATTERNS: Record<string, RegExp> = {
+  text: /.+/,
+  email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  phone: /^[\+]?[(]?[0-9]{1,3}[)]?[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,9}$/,
+  number: /^-?\d+(\.\d+)?$/,
+};
+
+// Interactive validation tester component
+interface ValidationTesterProps {
+  validationType: string;
+  customRegex?: string;
+  regexExample?: string;
+  onValidationResult?: (isValid: boolean, input: string) => void;
+}
+
+function ValidationTester({ validationType, customRegex, regexExample, onValidationResult }: ValidationTesterProps) {
+  const [testInput, setTestInput] = useState('');
+  const [isValid, setIsValid] = useState<boolean | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  
+  const regex = useMemo(() => {
+    if (validationType === 'custom' && customRegex) {
+      try {
+        return new RegExp(customRegex);
+      } catch {
+        return null;
+      }
+    }
+    return VALIDATION_PATTERNS[validationType] || VALIDATION_PATTERNS.text;
+  }, [validationType, customRegex]);
+  
+  const validateInput = useCallback((value: string) => {
+    if (!value.trim()) {
+      setIsValid(null);
+      return;
+    }
+    
+    if (!regex) {
+      setIsValid(false);
+      return;
+    }
+    
+    const valid = regex.test(value);
+    setIsValid(valid);
+    onValidationResult?.(valid, value);
+  }, [regex, onValidationResult]);
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setTestInput(value);
+    validateInput(value);
+  };
+  
+  const getValidationLabel = () => {
+    switch (validationType) {
+      case 'email': return 'Email';
+      case 'phone': return 'Телефон';
+      case 'number': return 'Число';
+      case 'custom': return 'Regex';
+      default: return 'Текст';
+    }
+  };
+  
+  const getPlaceholder = () => {
+    if (regexExample) return regexExample;
+    switch (validationType) {
+      case 'email': return 'user@example.com';
+      case 'phone': return '+7 999 123-45-67';
+      case 'number': return '123';
+      case 'custom': return 'Введите для проверки...';
+      default: return 'Введите текст...';
+    }
+  };
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="mt-2"
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <PlayCircle className="w-3.5 h-3.5 text-primary" />
+        <span className="text-[10px] font-medium text-primary">Интерактивная проверка</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+          {getValidationLabel()}
+        </span>
+      </div>
+      
+      <div className="relative">
+        <Input
+          value={testInput}
+          onChange={handleInputChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder={getPlaceholder()}
+          className={`h-8 text-xs pr-8 transition-all ${
+            isValid === true ? 'border-green-500 bg-green-500/5 focus-visible:ring-green-500/30' :
+            isValid === false ? 'border-red-500 bg-red-500/5 focus-visible:ring-red-500/30' :
+            ''
+          }`}
+        />
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          {isValid === true && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+          {isValid === false && <XCircle className="w-4 h-4 text-red-500" />}
+          {isValid === null && <Type className="w-4 h-4 text-muted-foreground/50" />}
+        </div>
+      </div>
+      
+      {isValid !== null && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-1.5"
+        >
+          {isValid ? (
+            <div className="flex items-center gap-1.5 text-[10px] text-green-600">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Ввод соответствует формату</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[10px] text-red-600">
+              <XCircle className="w-3 h-3" />
+              <span>Ввод не соответствует формату</span>
+            </div>
+          )}
+        </motion.div>
+      )}
+      
+      {validationType === 'custom' && customRegex && (
+        <div className="mt-1.5 text-[10px] text-muted-foreground font-mono bg-muted/50 px-2 py-1 rounded">
+          /{customRegex}/
+        </div>
+      )}
+    </motion.div>
+  );
+}
 
 // Flow preview component for wait_response and request_input actions
 interface FlowBranch {
@@ -20,6 +160,7 @@ interface FlowPreviewProps {
 }
 
 function FlowPreview({ actionType, config, menus }: FlowPreviewProps) {
+  const [showTester, setShowTester] = useState(false);
   const branches: FlowBranch[] = [];
   
   // Success branch
@@ -77,6 +218,9 @@ function FlowPreview({ actionType, config, menus }: FlowPreviewProps) {
     }
   };
   
+  const hasValidation = config.validationType && config.validationType !== 'text';
+  const hasCustomRegex = config.validationType === 'custom' && config.customRegex;
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -95,8 +239,24 @@ function FlowPreview({ actionType, config, menus }: FlowPreviewProps) {
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
               {config.validationType === 'email' ? 'Email' : 
                config.validationType === 'phone' ? 'Телефон' :
-               config.validationType === 'number' ? 'Число' : 'Текст'}
+               config.validationType === 'number' ? 'Число' :
+               config.validationType === 'custom' ? 'Regex' : 'Текст'}
             </span>
+          )}
+          
+          {/* Interactive test button */}
+          {(hasValidation || hasCustomRegex) && (
+            <button
+              onClick={() => setShowTester(!showTester)}
+              className={`ml-auto flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
+                showTester 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+              }`}
+            >
+              <PlayCircle className="w-3 h-3" />
+              Тест
+            </button>
           )}
         </div>
         
@@ -129,6 +289,17 @@ function FlowPreview({ actionType, config, menus }: FlowPreviewProps) {
             </motion.div>
           ))}
         </div>
+        
+        {/* Interactive validation tester */}
+        <AnimatePresence>
+          {showTester && (hasValidation || hasCustomRegex) && (
+            <ValidationTester 
+              validationType={config.validationType || 'text'}
+              customRegex={config.customRegex}
+              regexExample={config.regexExample}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

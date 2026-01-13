@@ -285,6 +285,160 @@ export function ConfigTextInput({
   );
 }
 
+// Специализированное поле для ввода regex с валидацией синтаксиса
+interface ConfigRegexInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  testValue?: string; // Значение для тестирования regex
+}
+
+export function ConfigRegexInput({ value, onChange, placeholder, testValue }: ConfigRegexInputProps) {
+  const [focused, setFocused] = useState(false);
+  const [regexError, setRegexError] = useState<string | null>(null);
+
+  // Валидация синтаксиса regex
+  const validateRegex = (pattern: string): { valid: boolean; error?: string } => {
+    if (!pattern) {
+      return { valid: true };
+    }
+    try {
+      new RegExp(pattern);
+      return { valid: true };
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Неверный синтаксис';
+      // Упростим сообщение об ошибке
+      let simpleError = errorMessage;
+      if (errorMessage.includes('Invalid regular expression')) {
+        const match = errorMessage.match(/: (.+)$/);
+        simpleError = match ? match[1] : 'Неверный синтаксис регулярного выражения';
+      }
+      return { valid: false, error: simpleError };
+    }
+  };
+
+  // Тест regex против примера
+  const testRegex = (pattern: string, test: string): { matches: boolean; error?: string } => {
+    if (!pattern || !test) {
+      return { matches: false };
+    }
+    try {
+      const regex = new RegExp(pattern);
+      return { matches: regex.test(test) };
+    } catch {
+      return { matches: false, error: 'Невозможно проверить' };
+    }
+  };
+
+  const handleChange = (newValue: string) => {
+    onChange(newValue);
+    const validation = validateRegex(newValue);
+    setRegexError(validation.valid ? null : (validation.error || 'Ошибка'));
+  };
+
+  // Результат теста против примера
+  const currentTestResult = (() => {
+    if (!value || !testValue || regexError) return null;
+    return testRegex(value, testValue);
+  })();
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">
+          /
+        </div>
+        <Input
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={placeholder}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          className={cn(
+            "telegram-input font-mono pl-6 pr-6",
+            regexError && "border-destructive focus-visible:ring-destructive"
+          )}
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">
+          /
+        </div>
+      </div>
+
+      {/* Ошибка синтаксиса */}
+      <AnimatePresence>
+        {regexError && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="flex items-start gap-1.5 p-2 rounded-lg bg-destructive/10 border border-destructive/30"
+          >
+            <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+            <div>
+              <span className="text-xs font-medium text-destructive">Ошибка в regex</span>
+              <p className="text-xs text-destructive/80">{regexError}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Результат теста против примера */}
+      <AnimatePresence>
+        {currentTestResult && testValue && !regexError && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className={cn(
+              "flex items-center gap-1.5 p-2 rounded-lg border",
+              currentTestResult.matches 
+                ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/50"
+                : "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/50"
+            )}
+          >
+            {currentTestResult.matches ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                <span className="text-xs text-green-700 dark:text-green-300">
+                  Пример "<span className="font-mono">{testValue}</span>" соответствует
+                </span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs text-amber-700 dark:text-amber-300">
+                  Пример "<span className="font-mono">{testValue}</span>" не соответствует
+                </span>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Подсказки по regex */}
+      {focused && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-2.5 rounded-lg bg-muted/50 border border-border"
+        >
+          <p className="text-xs text-muted-foreground mb-2">Часто используемые символы:</p>
+          <div className="grid grid-cols-2 gap-1.5 text-xs font-mono">
+            <div className="flex justify-between"><span className="text-primary">^</span><span className="text-muted-foreground">начало</span></div>
+            <div className="flex justify-between"><span className="text-primary">$</span><span className="text-muted-foreground">конец</span></div>
+            <div className="flex justify-between"><span className="text-primary">\d</span><span className="text-muted-foreground">цифра</span></div>
+            <div className="flex justify-between"><span className="text-primary">\w</span><span className="text-muted-foreground">буква/цифра</span></div>
+            <div className="flex justify-between"><span className="text-primary">[A-Z]</span><span className="text-muted-foreground">заглавные</span></div>
+            <div className="flex justify-between"><span className="text-primary">{"{n}"}</span><span className="text-muted-foreground">n раз</span></div>
+            <div className="flex justify-between"><span className="text-primary">+</span><span className="text-muted-foreground">1 и более</span></div>
+            <div className="flex justify-between"><span className="text-primary">*</span><span className="text-muted-foreground">0 и более</span></div>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 // Переключатель с понятным описанием
 interface ConfigToggleProps {
   checked: boolean;

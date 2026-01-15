@@ -22,7 +22,7 @@ export interface ActionFormMeta {
   title: string;
   description: string;
   icon: ReactNode;
-  category: 'basic' | 'data' | 'logic' | 'shop' | 'gamification' | 'interactive' | 'events' | 'automation';
+  category: 'basic' | 'data' | 'logic' | 'shop' | 'gamification' | 'interactive' | 'events' | 'automation' | 'ai';
   difficulty: 'easy' | 'medium' | 'advanced';
   previewLabel?: string;
 }
@@ -337,6 +337,42 @@ export const getActionFormMeta = (type: ActionType): ActionFormMeta => {
       description: 'Отправить всем или группе',
       icon: <Send className="w-5 h-5" />,
       category: 'automation',
+      difficulty: 'medium',
+    },
+    // AI & Интеграции
+    ai_response: {
+      title: 'AI Ответ',
+      description: 'Генерация текста с помощью ИИ',
+      icon: <Star className="w-5 h-5" />,
+      category: 'ai',
+      difficulty: 'medium',
+    },
+    http_request: {
+      title: 'HTTP Запрос',
+      description: 'Вызов внешнего API',
+      icon: <Link className="w-5 h-5" />,
+      category: 'ai',
+      difficulty: 'advanced',
+    },
+    json_parse: {
+      title: 'Парсинг JSON',
+      description: 'Извлечь данные из ответа',
+      icon: <Edit3 className="w-5 h-5" />,
+      category: 'ai',
+      difficulty: 'advanced',
+    },
+    format_text: {
+      title: 'Форматирование',
+      description: 'Создать текст по шаблону',
+      icon: <MessageSquare className="w-5 h-5" />,
+      category: 'ai',
+      difficulty: 'easy',
+    },
+    split_test: {
+      title: 'A/B Тест',
+      description: 'Сплит-тестирование вариантов',
+      icon: <GitBranch className="w-5 h-5" />,
+      category: 'ai',
       difficulty: 'medium',
     },
   };

@@ -1,8 +1,11 @@
 import { memo, useMemo } from 'react';
 import { Handle, Position, type Node } from '@xyflow/react';
 import { motion } from 'framer-motion';
-import { Trash2, Settings, Copy, icons, Package, ShoppingCart, CreditCard, Wallet, Plus, Dice1 } from 'lucide-react';
-import { BotActionNode, ACTION_INFO } from '@/types/bot';
+import { 
+  Trash2, Settings, Copy, icons, Package, ShoppingCart, CreditCard, Wallet, Plus, 
+  Sparkles, Zap, GitBranch, Database, Trophy, MessageCircle, Bell, Send
+} from 'lucide-react';
+import { BotActionNode, ACTION_INFO, CATEGORY_COLORS } from '@/types/bot';
 
 export interface ActionNodeData extends Record<string, unknown> {
   actionNode: BotActionNode;
@@ -23,28 +26,44 @@ interface ActionNodeProps {
   selected?: boolean;
 }
 
+// Fallback icons for categories
+const categoryIconMap: Record<string, React.ElementType> = {
+  basic: Zap,
+  data: Database,
+  logic: GitBranch,
+  shop: ShoppingCart,
+  gamification: Trophy,
+  interactive: MessageCircle,
+  events: Bell,
+  automation: Send,
+  ai: Sparkles,
+};
+
 function ActionNodeComponent({ data, selected }: ActionNodeProps) {
   const { actionNode, isOrphan, onEdit, onDelete, onDuplicate, incomingConnections = 0, outgoingConnections = 0 } = data;
   const isSelected = selected || data.isSelected;
 
   const actionInfo = ACTION_INFO[actionNode.type];
   const IconComponent = (icons as any)[actionInfo?.icon] || icons.Zap;
+  const category = actionInfo?.category || 'basic';
+  const categoryColors = CATEGORY_COLORS[category] || CATEGORY_COLORS.basic;
 
   // Check if this is a multi-output action
-  const isMultiOutput = actionNode.type === 'random_result' || actionNode.type === 'weighted_random';
+  const isMultiOutput = actionNode.type === 'random_result' || actionNode.type === 'weighted_random' || actionNode.type === 'split_test';
   const isWeighted = actionNode.type === 'weighted_random';
+  const isSplitTest = actionNode.type === 'split_test';
   const isIfElse = actionNode.type === 'if_else';
   const isLottery = actionNode.type === 'lottery';
   
-  // For random_result use outcomeCount, for weighted_random use outcomes array
+  // For random_result use outcomeCount, for weighted_random/split_test use outcomes array
   const weightedOutcomes = actionNode.config?.outcomes || [];
-  const outcomeCount = isWeighted 
+  const outcomeCount = isWeighted || isSplitTest
     ? weightedOutcomes.length || 2 
     : (actionNode.config?.outcomeCount || 2);
   const outcomes = actionNode.outcomes || [];
 
   // Calculate total weight for percentage display
-  const totalWeight = isWeighted 
+  const totalWeight = isWeighted || isSplitTest
     ? weightedOutcomes.reduce((sum: number, o: any) => sum + (o.weight || 1), 0) 
     : outcomeCount;
 
@@ -54,19 +73,19 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     const positions: { id: string; percent: number; label?: string }[] = [];
     
     for (let i = 0; i < outcomeCount; i++) {
-      const id = isWeighted 
+      const id = (isWeighted || isSplitTest)
         ? (weightedOutcomes[i]?.id || `outcome-${i}`)
         : (outcomes[i]?.id || `outcome-${i}`);
-      const weight = isWeighted ? (weightedOutcomes[i]?.weight || 1) : 1;
-      const percent = isWeighted 
+      const weight = (isWeighted || isSplitTest) ? (weightedOutcomes[i]?.weight || 1) : 1;
+      const percent = (isWeighted || isSplitTest)
         ? Math.round((weight / totalWeight) * 100)
         : Math.round(100 / outcomeCount);
-      const label = isWeighted ? weightedOutcomes[i]?.label : undefined;
+      const label = (isWeighted || isSplitTest) ? weightedOutcomes[i]?.label : undefined;
       
       positions.push({ id, percent, label });
     }
     return positions;
-  }, [isMultiOutput, isWeighted, outcomeCount, outcomes, weightedOutcomes, totalWeight]);
+  }, [isMultiOutput, isWeighted, isSplitTest, outcomeCount, outcomes, weightedOutcomes, totalWeight]);
 
   const getConfigPreview = () => {
     switch (actionNode.type) {
@@ -93,6 +112,12 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
         return `${outcomeCount} исходов`;
       case 'weighted_random':
         return `${outcomeCount} взвеш. исходов`;
+      case 'split_test':
+        return `A/B: ${outcomeCount} вариантов`;
+      case 'ai_response':
+        return actionNode.config.prompt ? 'AI настроен' : 'Настройте AI';
+      case 'http_request':
+        return actionNode.config.url ? `${actionNode.config.method || 'GET'} ...` : 'URL не задан';
       case 'show_product':
       case 'show_cart':
       case 'process_payment':
@@ -103,30 +128,6 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     }
   };
 
-  const getNodeColor = () => {
-    const type = actionNode.type;
-    if (['show_text', 'navigate_menu', 'open_url', 'delay', 'typing_indicator'].includes(type)) {
-      return 'bg-blue-500/10 border-blue-500/30 text-blue-500';
-    }
-    if (['set_field', 'change_field', 'add_tag', 'remove_tag', 'append_to_list', 'clear_field'].includes(type)) {
-      return 'bg-purple-500/10 border-purple-500/30 text-purple-500';
-    }
-    if (['if_else', 'check_subscription', 'check_role', 'check_value', 'wait_response'].includes(type)) {
-      return 'bg-amber-500/10 border-amber-500/30 text-amber-500';
-    }
-    if (type.includes('cart') || type.includes('product') || type.includes('payment') || type.includes('promo')) {
-      return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600';
-    }
-    if (['random_result', 'lottery'].includes(type)) {
-      return 'bg-pink-500/10 border-pink-500/30 text-pink-500';
-    }
-    if (type === 'weighted_random') {
-      return 'bg-orange-500/10 border-orange-500/30 text-orange-500';
-    }
-    return 'bg-muted border-border text-muted-foreground';
-  };
-
-  const colorClasses = getNodeColor();
   const configPreview = getConfigPreview();
   const isShowProduct = actionNode.type === 'show_product';
   const isShowCart = actionNode.type === 'show_cart';
@@ -152,7 +153,6 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     
     return (
       <div className="mt-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-        {/* Product Image */}
         {imageUrl ? (
           <div className="w-full h-16 bg-gray-100 dark:bg-gray-800 overflow-hidden">
             <img 
@@ -170,7 +170,6 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
           </div>
         )}
         
-        {/* Product Info */}
         <div className="p-2">
           <p className="text-[10px] font-medium text-gray-900 dark:text-gray-100 truncate">
             {productName || 'Название товара'}
@@ -188,7 +187,6 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
             )}
           </div>
           
-          {/* Add to cart button preview */}
           {actionNode.config.showAddToCart !== false && (
             <div className="mt-1.5 flex items-center justify-center gap-1 px-2 py-1 bg-emerald-500 text-white rounded text-[8px] font-medium">
               <ShoppingCart className="w-2.5 h-2.5" />
@@ -213,7 +211,6 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
           <span className="text-[10px] font-medium text-gray-900 dark:text-gray-100">Корзина</span>
         </div>
         
-        {/* Mock cart items */}
         <div className="p-1.5 space-y-1">
           <div className="flex items-center gap-1.5 p-1 bg-gray-50 dark:bg-gray-800 rounded">
             <div className="w-6 h-6 bg-emerald-100 dark:bg-emerald-900/30 rounded flex items-center justify-center">
@@ -224,22 +221,12 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
               <p className="text-[9px] font-medium text-gray-900 dark:text-gray-100">1 × 990 ₽</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 p-1 bg-gray-50 dark:bg-gray-800 rounded">
-            <div className="w-6 h-6 bg-emerald-100 dark:bg-emerald-900/30 rounded flex items-center justify-center">
-              <Package className="w-3 h-3 text-emerald-500/60" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[8px] text-gray-600 dark:text-gray-400 truncate">Товар 2</p>
-              <p className="text-[9px] font-medium text-gray-900 dark:text-gray-100">2 × 450 ₽</p>
-            </div>
-          </div>
         </div>
         
-        {/* Total */}
         {showTotal !== false && (
           <div className="p-1.5 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
             <span className="text-[9px] text-gray-500">Итого:</span>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">1 890 ₽</span>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">990 ₽</span>
           </div>
         )}
         
@@ -270,13 +257,11 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     
     return (
       <div className="mt-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-        {/* Provider header */}
         <div className={`p-2 ${providerInfo.color} text-white flex items-center gap-1.5`}>
           <CreditCard className="w-3.5 h-3.5" />
           <span className="text-[10px] font-medium">{providerInfo.name}</span>
         </div>
         
-        {/* Payment details */}
         <div className="p-2 space-y-1.5">
           {amount !== undefined && amount !== null && (
             <div className="flex items-center justify-between">
@@ -294,7 +279,6 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
             </div>
           )}
           
-          {/* Pay button */}
           <button className={`w-full py-1.5 ${providerInfo.color} text-white rounded text-[9px] font-medium flex items-center justify-center gap-1`}>
             <Wallet className="w-3 h-3" />
             Оплатить
@@ -357,27 +341,34 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
-  // Random/Weighted result preview for multi-output
+  // Random/Weighted/Split test result preview for multi-output
   const renderRandomResultPreview = () => {
     if (!isMultiOutput) return null;
     
-    const bgColor = isWeighted 
-      ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/30'
-      : 'bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800/30';
-    const textColor = isWeighted
-      ? 'text-orange-700 dark:text-orange-300'
-      : 'text-pink-700 dark:text-pink-300';
-    const subTextColor = isWeighted
-      ? 'text-orange-600 dark:text-orange-400'
-      : 'text-pink-600 dark:text-pink-400';
-    const iconColor = isWeighted ? 'text-orange-500' : 'text-pink-500';
+    const bgColor = isSplitTest 
+      ? 'bg-fuchsia-50 dark:bg-fuchsia-900/20 border-fuchsia-200 dark:border-fuchsia-800/30'
+      : isWeighted 
+        ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/30'
+        : 'bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800/30';
+    const textColor = isSplitTest
+      ? 'text-fuchsia-700 dark:text-fuchsia-300'
+      : isWeighted
+        ? 'text-orange-700 dark:text-orange-300'
+        : 'text-pink-700 dark:text-pink-300';
+    const subTextColor = isSplitTest
+      ? 'text-fuchsia-600 dark:text-fuchsia-400'
+      : isWeighted
+        ? 'text-orange-600 dark:text-orange-400'
+        : 'text-pink-600 dark:text-pink-400';
+    const NodeIcon = isSplitTest ? icons.FlaskConical : icons.Dices;
+    const iconColor = isSplitTest ? 'text-fuchsia-500' : isWeighted ? 'text-orange-500' : 'text-pink-500';
     
     return (
       <div className={`mt-2 p-2 rounded-lg border ${bgColor}`}>
         <div className="flex items-center gap-1.5 mb-2">
-          <Dice1 className={`w-3.5 h-3.5 ${iconColor}`} />
+          <NodeIcon className={`w-3.5 h-3.5 ${iconColor}`} />
           <span className={`text-[10px] font-medium ${textColor}`}>
-            {isWeighted ? 'Взвешенный выбор' : 'Случайный выбор'}
+            {isSplitTest ? 'A/B Тест' : isWeighted ? 'Взвешенный выбор' : 'Случайный выбор'}
           </span>
         </div>
         <div className="space-y-1">
@@ -387,7 +378,7 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
               className="flex items-center justify-between text-[9px] p-1 bg-white/50 dark:bg-black/20 rounded"
             >
               <span className={subTextColor}>
-                {pos.label || `Исход ${i + 1}`}
+                {pos.label || (isSplitTest ? `Вариант ${String.fromCharCode(65 + i)}` : `Исход ${i + 1}`)}
               </span>
               <span className={`font-medium ${textColor}`}>{pos.percent}%</span>
             </div>
@@ -411,13 +402,16 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
       conditionText = `Баллы ${opSymbol} ${value || '?'}`;
     } else {
       const opSymbol = { equals: '=', not_equals: '≠', greater: '>', greater_eq: '≥', less: '<', less_eq: '≤', contains: '∋', exists: '∃' }[operator as string] || '=';
-      conditionText = operator === 'exists' ? `${field || '?'} существует` : `${field || '?'} ${opSymbol} ${value || '?'}`;
+      conditionText = `${field || '?'} ${opSymbol} ${value || '?'}`;
     }
     
     return (
-      <div className="mt-2 p-2 rounded-lg border bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/30">
-        <div className="text-[10px] text-purple-700 dark:text-purple-300 font-medium mb-2 truncate">
-          {conditionText}
+      <div className="mt-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
+        <div className="flex items-center gap-1.5 mb-2">
+          <GitBranch className="w-3.5 h-3.5 text-amber-500" />
+          <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 truncate">
+            {conditionText}
+          </span>
         </div>
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-[9px] p-1 bg-white/50 dark:bg-black/20 rounded">
@@ -433,19 +427,18 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
-  // Lottery preview with win/lose outputs
+  // Lottery preview
   const renderLotteryPreview = () => {
     if (!isLottery) return null;
     
-    const winChance = actionNode.config.winChance || 10;
-    const prize = actionNode.config.prize;
+    const { winChance, prize } = actionNode.config;
     
     return (
-      <div className="mt-2 p-2 rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/30">
+      <div className="mt-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
         <div className="flex items-center gap-1.5 mb-2">
-          <span className="text-sm">🎰</span>
+          <icons.Ticket className="w-3.5 h-3.5 text-amber-500" />
           <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">
-            Шанс: {winChance}%
+            Шанс: {winChance || 10}%
           </span>
         </div>
         {prize && (
@@ -467,12 +460,31 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
     );
   };
 
+  // AI preview
+  const renderAIPreview = () => {
+    if (actionNode.type !== 'ai_response') return null;
+    
+    return (
+      <div className="mt-2 p-2 rounded-lg bg-gradient-to-br from-fuchsia-50 to-purple-50 dark:from-fuchsia-900/20 dark:to-purple-900/20 border border-fuchsia-200 dark:border-fuchsia-800/30">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Sparkles className="w-3.5 h-3.5 text-fuchsia-500" />
+          <span className="text-[10px] font-medium text-fuchsia-700 dark:text-fuchsia-300">
+            AI Генерация
+          </span>
+        </div>
+        <p className="text-[9px] text-fuchsia-600 dark:text-fuchsia-400 truncate">
+          {actionNode.config.prompt ? actionNode.config.prompt.slice(0, 40) + '...' : 'Настройте промпт'}
+        </p>
+      </div>
+    );
+  };
+
   // Calculate dynamic height for multi-output nodes
   const nodeMinHeight = isMultiOutput ? Math.max(120, outcomeCount * 35 + 80) : (isIfElse || isLottery ? 140 : undefined);
 
   return (
     <div className="relative" style={{ marginTop: 12, marginLeft: 12 }}>
-      {/* Connection count badges - outside the node to avoid overflow clipping */}
+      {/* Connection count badges */}
       {incomingConnections > 0 && (
         <div className="node-connection-badge incoming" title={`${incomingConnections} входящих`}>
           ←{incomingConnections}
@@ -494,134 +506,135 @@ function ActionNodeComponent({ data, selected }: ActionNodeProps) {
             : undefined
         }}
         transition={{ duration: 0.15, ease: 'easeOut' }}
-        className={`action-node builder-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-colors ${colorClasses} ${
+        className={`action-node builder-node rounded-xl border-2 p-3 shadow-lg backdrop-blur-sm transition-all ${categoryColors.bg} ${categoryColors.border} ${categoryColors.text} ${
           isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
-        } ${isOrphan ? 'border-orange-400' : ''}`}
+        } ${isOrphan ? '!border-orange-400' : ''}`}
         style={{ 
           minWidth: hasCustomPreview || isMultiOutput ? 200 : 180, 
           maxWidth: hasCustomPreview || isMultiOutput ? 240 : 220,
           minHeight: nodeMinHeight,
         }}
       >
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!w-3 !h-3 !bg-current !border-2 !border-background !rounded-full"
-        style={{ left: -6 }}
-      />
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!w-3 !h-3 !bg-current !border-2 !border-background !rounded-full transition-transform hover:!scale-125"
+          style={{ left: -6 }}
+        />
 
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-current/20">
-            <IconComponent className="w-4 h-4" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center bg-gradient-to-br ${categoryColors.gradient} text-white shadow-sm`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-semibold">{actionInfo?.name || actionNode.type}</span>
           </div>
-          <span className="text-xs font-semibold">{actionInfo?.name || actionNode.type}</span>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              title="Редактировать"
+            >
+              <Settings className="w-3 h-3" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              title="Дублировать"
+            >
+              <Copy className="w-3 h-3" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="p-1 rounded hover:bg-destructive/20 transition-colors"
+              title="Удалить"
+            >
+              <Trash2 className="w-3 h-3 text-destructive" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="p-1 rounded hover:bg-black/10 transition-colors"
-            title="Редактировать"
-          >
-            <Settings className="w-3 h-3" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
-            className="p-1 rounded hover:bg-black/10 transition-colors"
-            title="Дублировать"
-          >
-            <Copy className="w-3 h-3" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-1 rounded hover:bg-destructive/20 transition-colors"
-            title="Удалить"
-          >
-            <Trash2 className="w-3 h-3 text-destructive" />
-          </button>
-        </div>
-      </div>
 
-      {configPreview && !isMultiOutput && (
-        <div className="text-[10px] opacity-80 truncate">
-          {configPreview}
-        </div>
-      )}
+        {configPreview && !isMultiOutput && !isIfElse && !isLottery && actionNode.type !== 'ai_response' && (
+          <div className="text-[10px] opacity-80 truncate">
+            {configPreview}
+          </div>
+        )}
 
-      {renderProductPreview()}
-      {renderCartPreview()}
-      {renderPaymentPreview()}
-      {renderAddToCartPreview()}
-      {renderRandomResultPreview()}
-      {renderIfElsePreview()}
-      {renderLotteryPreview()}
+        {renderProductPreview()}
+        {renderCartPreview()}
+        {renderPaymentPreview()}
+        {renderAddToCartPreview()}
+        {renderRandomResultPreview()}
+        {renderIfElsePreview()}
+        {renderLotteryPreview()}
+        {renderAIPreview()}
 
-      {/* Single output handle for non-multi-output nodes */}
-      {!isMultiOutput && !isIfElse && !isLottery && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="!w-3 !h-3 !bg-current !border-2 !border-background !rounded-full"
-          style={{ right: -6 }}
-        />
-      )}
-
-      {/* If/else two output handles */}
-      {isIfElse && (
-        <>
+        {/* Single output handle for non-multi-output nodes */}
+        {!isMultiOutput && !isIfElse && !isLottery && (
           <Handle
             type="source"
             position={Position.Right}
-            id="yes"
-            className="!w-3 !h-3 !bg-green-500 !border-2 !border-background !rounded-full"
-            style={{ right: -6, top: '40%' }}
+            className="!w-3 !h-3 !bg-current !border-2 !border-background !rounded-full transition-transform hover:!scale-125"
+            style={{ right: -6 }}
           />
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="no"
-            className="!w-3 !h-3 !bg-red-500 !border-2 !border-background !rounded-full"
-            style={{ right: -6, top: '70%' }}
-          />
-        </>
-      )}
+        )}
 
-      {/* Lottery two output handles: win and lose */}
-      {isLottery && (
-        <>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={actionNode.outcomes?.[0]?.id || 'win'}
-            className="!w-3 !h-3 !bg-green-500 !border-2 !border-background !rounded-full"
-            style={{ right: -6, top: '40%' }}
-          />
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={actionNode.outcomes?.[1]?.id || 'lose'}
-            className="!w-3 !h-3 !bg-red-500 !border-2 !border-background !rounded-full"
-            style={{ right: -6, top: '70%' }}
-          />
-        </>
-      )}
+        {/* If/else two output handles */}
+        {isIfElse && (
+          <>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="yes"
+              className="!w-3 !h-3 !bg-green-500 !border-2 !border-background !rounded-full transition-transform hover:!scale-125"
+              style={{ right: -6, top: '40%' }}
+            />
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="no"
+              className="!w-3 !h-3 !bg-red-500 !border-2 !border-background !rounded-full transition-transform hover:!scale-125"
+              style={{ right: -6, top: '70%' }}
+            />
+          </>
+        )}
 
-      {/* Multiple output handles for random_result / weighted_random */}
-      {isMultiOutput && handlePositions.map((pos, i) => (
-        <Handle
-          key={pos.id}
-          type="source"
-          position={Position.Right}
-          id={pos.id}
-          className={`!w-3 !h-3 !border-2 !border-background !rounded-full ${
-            isWeighted ? '!bg-orange-500' : '!bg-pink-500'
-          }`}
-          style={{ 
-            right: -6, 
-            top: `${((i + 1) / (outcomeCount + 1)) * 100}%`,
-          }}
-        />
-      ))}
+        {/* Lottery two output handles */}
+        {isLottery && (
+          <>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={actionNode.outcomes?.[0]?.id || 'win'}
+              className="!w-3 !h-3 !bg-green-500 !border-2 !border-background !rounded-full transition-transform hover:!scale-125"
+              style={{ right: -6, top: '40%' }}
+            />
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={actionNode.outcomes?.[1]?.id || 'lose'}
+              className="!w-3 !h-3 !bg-red-500 !border-2 !border-background !rounded-full transition-transform hover:!scale-125"
+              style={{ right: -6, top: '70%' }}
+            />
+          </>
+        )}
+
+        {/* Multiple output handles for random_result / weighted_random / split_test */}
+        {isMultiOutput && handlePositions.map((pos, i) => (
+          <Handle
+            key={pos.id}
+            type="source"
+            position={Position.Right}
+            id={pos.id}
+            className={`!w-3 !h-3 !border-2 !border-background !rounded-full transition-transform hover:!scale-125 ${
+              isSplitTest ? '!bg-fuchsia-500' : isWeighted ? '!bg-orange-500' : '!bg-pink-500'
+            }`}
+            style={{ 
+              right: -6, 
+              top: `${((i + 1) / (outcomeCount + 1)) * 100}%`,
+            }}
+          />
+        ))}
       </motion.div>
     </div>
   );

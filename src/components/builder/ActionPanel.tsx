@@ -4,9 +4,10 @@ import {
   X, Search, Zap, Database, GitBranch, ShoppingCart, Trophy, MessageCircle, Bell, Send,
   MessageSquare, ArrowRight, ExternalLink, Clock, MoreHorizontal, Edit3, Plus, List, Trash2,
   Tag, UserCheck, Shield, CheckCircle, XCircle, Hash, Package, Archive, Percent, ShoppingBag,
-  Trash, CreditCard, Gift, Star, Edit, HelpCircle, UserPlus, Timer, Target, Calendar
+  Trash, CreditCard, Gift, Star, Edit, HelpCircle, UserPlus, Timer, Target, Calendar,
+  Sparkles, Globe, Braces, FileType, FlaskConical, icons
 } from 'lucide-react';
-import { ACTION_CATEGORIES, ACTION_INFO, ActionType } from '@/types/bot';
+import { ACTION_CATEGORIES, ACTION_INFO, ActionType, CATEGORY_COLORS } from '@/types/bot';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,6 +21,7 @@ const categoryIcons: Record<string, React.ElementType> = {
   interactive: MessageCircle,
   events: Bell,
   automation: Send,
+  ai: Sparkles,
 };
 
 const actionIcons: Record<string, React.ElementType> = {
@@ -27,7 +29,7 @@ const actionIcons: Record<string, React.ElementType> = {
   Tag, TagOff: Tag, UserCheck, Shield, CheckCircle, XCircle, Search, Hash, Package, X,
   Archive, Percent, ShoppingBag, Trash, CreditCard, Dice1: Gift, Dice3: Gift, Gift, Trophy,
   Star, Edit, HelpCircle, UserPlus, Timer, Target, Bell, Calendar, Send, MessageCircle,
-  GitBranch, ShoppingCart, Database, Zap,
+  GitBranch, ShoppingCart, Database, Zap, Sparkles, Globe, Braces, FileType, FlaskConical,
 };
 
 interface ActionPanelProps {

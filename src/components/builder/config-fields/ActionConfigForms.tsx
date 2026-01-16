@@ -3013,6 +3013,156 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
         </div>
       );
 
+    // AI Response
+    case 'ai_response':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="info">
+            Бот использует ИИ для генерации ответа на основе контекста разговора.
+          </ConfigInfo>
+
+          <ConfigField
+            label="Системный промпт"
+            description="Инструкции для ИИ: как отвечать, какой стиль"
+            example="Ты — дружелюбный ассистент магазина..."
+            required
+          >
+            <textarea
+              value={config.systemPrompt || ''}
+              onChange={(e) => updateConfig('systemPrompt', e.target.value)}
+              placeholder="Ты — полезный ассистент. Отвечай кратко и по делу."
+              className="w-full min-h-[100px] rounded-lg border border-border bg-background px-3 py-2 text-sm resize-y"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Модель ИИ"
+            description="Какую модель использовать"
+          >
+            <ConfigSelect
+              value={config.model || 'gemini-flash'}
+              onChange={(v) => updateConfig('model', v)}
+              options={[
+                { value: 'gemini-flash', label: 'Gemini Flash', description: 'Быстрый, для простых задач' },
+                { value: 'gemini-pro', label: 'Gemini Pro', description: 'Умнее, для сложных задач' },
+                { value: 'gpt-4', label: 'GPT-4', description: 'Самый умный' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Максимум токенов"
+            description="Ограничение длины ответа"
+          >
+            <ConfigNumber
+              value={config.maxTokens || 500}
+              onChange={(v) => updateConfig('maxTokens', v)}
+              min={50}
+              max={4000}
+              presets={[
+                { value: 150, label: 'Короткий' },
+                { value: 500, label: 'Средний' },
+                { value: 1500, label: 'Длинный' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigToggle
+            checked={config.includeHistory || false}
+            onChange={(v) => updateConfig('includeHistory', v)}
+            label="Учитывать историю"
+            description="Передавать предыдущие сообщения для контекста"
+          />
+        </div>
+      );
+
+    // HTTP Request
+    case 'http_request':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="warning">
+            Внешний API запрос. Убедитесь, что API доступен и настроен правильно.
+          </ConfigInfo>
+
+          <ConfigField
+            label="URL адрес"
+            description="Адрес API для запроса"
+            example="https://api.example.com/data"
+            required
+          >
+            <ConfigTextInput
+              value={config.url || ''}
+              onChange={(v) => updateConfig('url', v)}
+              placeholder="https://api.example.com/endpoint"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Метод запроса"
+            description="Тип HTTP запроса"
+          >
+            <ConfigSelect
+              value={config.method || 'GET'}
+              onChange={(v) => updateConfig('method', v)}
+              options={[
+                { value: 'GET', label: 'GET', description: 'Получить данные' },
+                { value: 'POST', label: 'POST', description: 'Отправить данные' },
+                { value: 'PUT', label: 'PUT', description: 'Обновить данные' },
+                { value: 'DELETE', label: 'DELETE', description: 'Удалить данные' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Заголовки (JSON)"
+            description="Дополнительные заголовки запроса"
+            example='{"Authorization": "Bearer token"}'
+          >
+            <textarea
+              value={config.headers || ''}
+              onChange={(e) => updateConfig('headers', e.target.value)}
+              placeholder='{"Content-Type": "application/json"}'
+              className="w-full min-h-[60px] rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono resize-y"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Тело запроса (JSON)"
+            description="Данные для отправки (POST/PUT)"
+          >
+            <textarea
+              value={config.body || ''}
+              onChange={(e) => updateConfig('body', e.target.value)}
+              placeholder='{"key": "value"}'
+              className="w-full min-h-[80px] rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono resize-y"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Сохранить результат в"
+            description="Название переменной для ответа"
+          >
+            <ConfigTextInput
+              value={config.responseField || ''}
+              onChange={(v) => updateConfig('responseField', v)}
+              placeholder="api_response"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Таймаут (сек)"
+            description="Максимальное время ожидания"
+          >
+            <ConfigNumber
+              value={config.timeout || 30}
+              onChange={(v) => updateConfig('timeout', v)}
+              min={5}
+              max={120}
+            />
+          </ConfigField>
+        </div>
+      );
+
     default:
       return (
         <ConfigInfo type="info">

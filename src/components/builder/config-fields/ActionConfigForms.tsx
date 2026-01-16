@@ -3159,7 +3159,266 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
               min={5}
               max={120}
             />
+      </ConfigField>
+        </div>
+      );
+
+    // JSON Parse
+    case 'json_parse':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="info">
+            Извлекает данные из JSON-ответа API или другого источника по заданному пути.
+          </ConfigInfo>
+
+          <ConfigField
+            label="Исходные данные"
+            description="Переменная с JSON для парсинга"
+            example="api_response"
+            required
+          >
+            <ConfigTextInput
+              value={config.sourceField || ''}
+              onChange={(v) => updateConfig('sourceField', v)}
+              placeholder="api_response"
+            />
           </ConfigField>
+
+          <ConfigField
+            label="Путь к данным"
+            description="JSONPath или путь через точку к нужному значению"
+            example="data.users[0].name"
+            required
+          >
+            <ConfigTextInput
+              value={config.jsonPath || ''}
+              onChange={(v) => updateConfig('jsonPath', v)}
+              placeholder="data.result.value"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Сохранить в"
+            description="Название переменной для результата"
+            required
+          >
+            <ConfigTextInput
+              value={config.targetField || ''}
+              onChange={(v) => updateConfig('targetField', v)}
+              placeholder="parsed_value"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Значение по умолчанию"
+            description="Если путь не найден — использовать это значение"
+          >
+            <ConfigTextInput
+              value={config.defaultValue || ''}
+              onChange={(v) => updateConfig('defaultValue', v)}
+              placeholder="Не найдено"
+            />
+          </ConfigField>
+
+          <ConfigToggle
+            checked={config.parseNumbers || false}
+            onChange={(v) => updateConfig('parseNumbers', v)}
+            label="Парсить числа"
+            description="Преобразовывать строки в числа если возможно"
+          />
+
+          <ConfigInfo type="tip">
+            Примеры путей: <code>data.name</code>, <code>items[0]</code>, <code>user.addresses[1].city</code>
+          </ConfigInfo>
+        </div>
+      );
+
+    // Format Text
+    case 'format_text':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="info">
+            Создаёт текст по шаблону с подстановкой переменных и форматированием.
+          </ConfigInfo>
+
+          <ConfigField
+            label="Шаблон текста"
+            description="Используйте {переменная} для подстановки значений"
+            example="Привет, {user.name}! Ваш баланс: {user.balance}₽"
+            required
+          >
+            <textarea
+              value={config.template || ''}
+              onChange={(e) => updateConfig('template', e.target.value)}
+              placeholder="Привет, {first_name}! 
+              
+Ваш заказ №{order_id} на сумму {total}₽ оформлен.
+
+Спасибо за покупку!"
+              className="w-full min-h-[120px] rounded-lg border border-border bg-background px-3 py-2 text-sm resize-y"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Сохранить результат в"
+            description="Переменная для сформированного текста"
+          >
+            <ConfigTextInput
+              value={config.targetField || ''}
+              onChange={(v) => updateConfig('targetField', v)}
+              placeholder="formatted_message"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Формат чисел"
+            description="Как форматировать числа в шаблоне"
+          >
+            <ConfigSelect
+              value={config.numberFormat || 'default'}
+              onChange={(v) => updateConfig('numberFormat', v)}
+              options={[
+                { value: 'default', label: 'Как есть', description: '1234.56' },
+                { value: 'spaces', label: 'С пробелами', description: '1 234.56' },
+                { value: 'round', label: 'Округлить', description: '1235' },
+                { value: 'currency', label: 'Валюта', description: '1 234,56 ₽' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Формат даты"
+            description="Как форматировать даты"
+          >
+            <ConfigSelect
+              value={config.dateFormat || 'short'}
+              onChange={(v) => updateConfig('dateFormat', v)}
+              options={[
+                { value: 'short', label: 'Короткий', description: '15.01.2024' },
+                { value: 'long', label: 'Полный', description: '15 января 2024' },
+                { value: 'relative', label: 'Относительный', description: 'вчера, 2 дня назад' },
+                { value: 'time', label: 'Со временем', description: '15.01.2024 14:30' },
+              ]}
+            />
+          </ConfigField>
+
+          <ConfigToggle
+            checked={config.trimEmpty || true}
+            onChange={(v) => updateConfig('trimEmpty', v)}
+            label="Убирать пустые строки"
+            description="Удалять строки с несуществующими переменными"
+          />
+
+          <ConfigInfo type="tip">
+            Доступные переменные: {'{first_name}'}, {'{last_name}'}, {'{user_id}'}, {'{username}'}, а также все сохранённые поля.
+          </ConfigInfo>
+        </div>
+      );
+
+    // Split Test (A/B)
+    case 'split_test':
+      return (
+        <div className="space-y-4">
+          <ConfigInfo type="info">
+            Разделяет пользователей на группы для A/B тестирования разных вариантов.
+          </ConfigInfo>
+
+          <ConfigField
+            label="Название теста"
+            description="Уникальное имя для идентификации теста"
+            example="welcome_message_v2"
+            required
+          >
+            <ConfigTextInput
+              value={config.testName || ''}
+              onChange={(v) => updateConfig('testName', v)}
+              placeholder="welcome_test"
+            />
+          </ConfigField>
+
+          <ConfigField
+            label="Количество вариантов"
+            description="Сколько веток тестирования (2-5)"
+          >
+            <ConfigNumber
+              value={config.variants || 2}
+              onChange={(v) => updateConfig('variants', Math.max(2, Math.min(5, v)))}
+              min={2}
+              max={5}
+              presets={[
+                { value: 2, label: 'A/B' },
+                { value: 3, label: 'A/B/C' },
+                { value: 4, label: '4 варианта' },
+              ]}
+            />
+          </ConfigField>
+
+          <div className="space-y-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+            <p className="text-sm font-medium">Распределение трафика</p>
+            {Array.from({ length: config.variants || 2 }).map((_, i) => {
+              const variantName = String.fromCharCode(65 + i); // A, B, C...
+              const weights = config.weights || [50, 50];
+              return (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold">
+                    {variantName}
+                  </span>
+                  <div className="flex-1">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={weights[i] || Math.floor(100 / (config.variants || 2))}
+                      onChange={(e) => {
+                        const newWeights = [...(config.weights || Array((config.variants || 2)).fill(Math.floor(100 / (config.variants || 2))))];
+                        newWeights[i] = parseInt(e.target.value);
+                        updateConfig('weights', newWeights);
+                      }}
+                      className="w-full accent-primary"
+                    />
+                  </div>
+                  <span className="w-12 text-right text-sm font-mono">
+                    {weights[i] || Math.floor(100 / (config.variants || 2))}%
+                  </span>
+                </div>
+              );
+            })}
+            <p className="text-xs text-muted-foreground">
+              Всего: {(config.weights || [50, 50]).reduce((a: number, b: number) => a + b, 0)}%
+              {(config.weights || [50, 50]).reduce((a: number, b: number) => a + b, 0) !== 100 && 
+                <span className="text-amber-500 ml-2">⚠ Сумма должна быть 100%</span>
+              }
+            </p>
+          </div>
+
+          <ConfigToggle
+            checked={config.persistent || true}
+            onChange={(v) => updateConfig('persistent', v)}
+            label="Запомнить группу пользователя"
+            description="Пользователь всегда попадает в одну и ту же группу"
+          />
+
+          <ConfigToggle
+            checked={config.trackConversions || false}
+            onChange={(v) => updateConfig('trackConversions', v)}
+            label="Отслеживать конверсии"
+            description="Считать успешные действия для каждого варианта"
+          />
+
+          <ConfigField
+            label="Сохранить вариант в"
+            description="Переменная с названием выбранной группы (A, B, C...)"
+          >
+            <ConfigTextInput
+              value={config.resultField || ''}
+              onChange={(v) => updateConfig('resultField', v)}
+              placeholder="test_group"
+            />
+          </ConfigField>
+
+          <ConfigInfo type="tip">
+            После теста подключите разные действия к каждому выходу (A, B, C...) для разных сценариев.
+          </ConfigInfo>
         </div>
       );
 

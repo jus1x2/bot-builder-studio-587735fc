@@ -1,6 +1,6 @@
-import { useState, useEffect, forwardRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, forwardRef, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, MoreVertical, Send, RotateCcw, ArrowRight, CheckCircle2, XCircle, Clock, PlayCircle, Type } from 'lucide-react';
+import { ChevronLeft, MoreVertical, Send, RotateCcw, ArrowRight, CheckCircle2, XCircle, Clock, PlayCircle, Type, Sparkles } from 'lucide-react';
 import { BotMenu, BotButton, BotActionNode } from '@/types/bot';
 import { interpolateVariables, UserContext } from '@/hooks/useActionExecutor';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,78 @@ const VALIDATION_PATTERNS: Record<string, RegExp> = {
   phone: /^[\+]?[(]?[0-9]{1,3}[)]?[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,9}$/,
   number: /^-?\d+(\.\d+)?$/,
 };
+
+// Typing message component with realistic character-by-character animation
+interface TypingMessageProps {
+  text: string;
+  onComplete?: () => void;
+  speed?: number;
+  showCursor?: boolean;
+}
+
+function TypingMessage({ text, onComplete, speed = 25, showCursor = true }: TypingMessageProps) {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isComplete, setIsComplete] = useState(false);
+  const [cursorVisible, setCursorVisible] = useState(true);
+  
+  useEffect(() => {
+    setDisplayedText('');
+    setIsComplete(false);
+    setCursorVisible(true);
+    
+    if (!text) {
+      setIsComplete(true);
+      onComplete?.();
+      return;
+    }
+
+    let index = 0;
+    const chars = [...text]; // Handle unicode properly
+    
+    const typeNext = () => {
+      if (index < chars.length) {
+        const char = chars[index];
+        setDisplayedText(chars.slice(0, index + 1).join(''));
+        index++;
+        
+        // Variable speed for more natural typing
+        const isPunctuation = ['.', ',', '!', '?', ':', ';'].includes(char);
+        const isSpace = char === ' ';
+        const nextDelay = isPunctuation ? speed * 4 : isSpace ? speed * 1.5 : speed + Math.random() * 15;
+        
+        setTimeout(typeNext, nextDelay);
+      } else {
+        setIsComplete(true);
+        onComplete?.();
+      }
+    };
+    
+    const startDelay = setTimeout(typeNext, 100);
+    return () => clearTimeout(startDelay);
+  }, [text, speed, onComplete]);
+
+  // Blinking cursor
+  useEffect(() => {
+    if (!showCursor) return;
+    const interval = setInterval(() => {
+      setCursorVisible(v => !v);
+    }, 530);
+    return () => clearInterval(interval);
+  }, [showCursor]);
+
+  return (
+    <span>
+      {displayedText}
+      {showCursor && !isComplete && (
+        <motion.span 
+          className="inline-block w-0.5 h-4 bg-primary ml-0.5 align-middle"
+          animate={{ opacity: cursorVisible ? 1 : 0 }}
+          transition={{ duration: 0.1 }}
+        />
+      )}
+    </span>
+  );
+}
 
 // Interactive validation tester component
 interface ValidationTesterProps {
@@ -352,8 +424,8 @@ function parseMarkdown(text: string): React.ReactNode[] {
   }).flat();
 }
 
-// Typing animation hook
-function useTypingAnimation(text: string, speed: number = 30) {
+// Enhanced typing animation hook with variable speed
+function useTypingAnimation(text: string, speed: number = 25) {
   const [displayedText, setDisplayedText] = useState('');
   const [isComplete, setIsComplete] = useState(false);
 
@@ -361,50 +433,107 @@ function useTypingAnimation(text: string, speed: number = 30) {
     setDisplayedText('');
     setIsComplete(false);
 
-    if (!text) return;
+    if (!text) {
+      setIsComplete(true);
+      return;
+    }
 
+    const chars = [...text]; // Handle unicode properly
     let index = 0;
-    const interval = setInterval(() => {
-      if (index < text.length) {
-        setDisplayedText(text.slice(0, index + 1));
+    let timeoutId: NodeJS.Timeout;
+
+    const typeNext = () => {
+      if (index < chars.length) {
+        const char = chars[index];
+        setDisplayedText(chars.slice(0, index + 1).join(''));
         index++;
+        
+        // Variable speed for more natural typing
+        const isPunctuation = ['.', ',', '!', '?', ':', ';', '\n'].includes(char);
+        const isSpace = char === ' ';
+        const nextDelay = isPunctuation ? speed * 5 : isSpace ? speed * 1.5 : speed + Math.random() * 20;
+        
+        timeoutId = setTimeout(typeNext, nextDelay);
       } else {
         setIsComplete(true);
-        clearInterval(interval);
       }
-    }, speed);
+    };
 
-    return () => clearInterval(interval);
+    timeoutId = setTimeout(typeNext, 150);
+    return () => clearTimeout(timeoutId);
   }, [text, speed]);
 
   return { displayedText, isComplete };
 }
 
-// Typing indicator component
+// Enhanced typing indicator with smooth animation
 function TypingIndicator() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
+      initial={{ opacity: 0, y: 15, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.9 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
       className="max-w-[85%]"
     >
-      <div className="bg-card rounded-2xl rounded-tl-md px-4 py-3 shadow-sm inline-flex items-center gap-1">
+      <div className="bg-card rounded-2xl rounded-tl-md px-4 py-3 shadow-sm inline-flex items-center gap-1.5">
         <motion.span
-          className="w-2 h-2 bg-muted-foreground/50 rounded-full"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+          className="w-2 h-2 bg-primary/60 rounded-full"
+          animate={{ y: [0, -4, 0], scale: [1, 1.1, 1] }}
+          transition={{ duration: 0.5, repeat: Infinity, delay: 0 }}
         />
         <motion.span
-          className="w-2 h-2 bg-muted-foreground/50 rounded-full"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+          className="w-2 h-2 bg-primary/60 rounded-full"
+          animate={{ y: [0, -4, 0], scale: [1, 1.1, 1] }}
+          transition={{ duration: 0.5, repeat: Infinity, delay: 0.15 }}
         />
         <motion.span
-          className="w-2 h-2 bg-muted-foreground/50 rounded-full"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
+          className="w-2 h-2 bg-primary/60 rounded-full"
+          animate={{ y: [0, -4, 0], scale: [1, 1.1, 1] }}
+          transition={{ duration: 0.5, repeat: Infinity, delay: 0.3 }}
         />
+      </div>
+    </motion.div>
+  );
+}
+
+// AI Response indicator
+function AIResponseIndicator({ model }: { model?: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.9 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      className="max-w-[85%]"
+    >
+      <div className="bg-gradient-to-r from-fuchsia-500/10 to-violet-500/10 border border-fuchsia-500/20 rounded-2xl rounded-tl-md px-4 py-3 shadow-sm inline-flex items-center gap-2">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+        >
+          <Sparkles className="w-4 h-4 text-fuchsia-500" />
+        </motion.div>
+        <span className="text-xs text-fuchsia-600 font-medium">
+          {model ? `${model} думает...` : 'AI думает...'}
+        </span>
+        <div className="flex gap-1">
+          <motion.span
+            className="w-1.5 h-1.5 bg-fuchsia-500/60 rounded-full"
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+          />
+          <motion.span
+            className="w-1.5 h-1.5 bg-fuchsia-500/60 rounded-full"
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+          />
+          <motion.span
+            className="w-1.5 h-1.5 bg-fuchsia-500/60 rounded-full"
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+          />
+        </div>
       </div>
     </motion.div>
   );
@@ -1205,11 +1334,38 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
     setActionMessages([]);
   };
 
+  // Enhanced screen transition variants
   const slideVariants = {
-    enter: (dir: number) => ({ x: dir > 0 ? 100 : -100, opacity: 0 }),
-    center: { x: 0, opacity: 1 },
-    exit: (dir: number) => ({ x: dir > 0 ? -100 : 100, opacity: 0 }),
+    enter: (dir: number) => ({ 
+      x: dir > 0 ? '100%' : '-100%', 
+      opacity: 0,
+      scale: 0.95,
+      filter: 'blur(4px)'
+    }),
+    center: { 
+      x: 0, 
+      opacity: 1,
+      scale: 1,
+      filter: 'blur(0px)'
+    },
+    exit: (dir: number) => ({ 
+      x: dir > 0 ? '-50%' : '50%', 
+      opacity: 0,
+      scale: 0.9,
+      filter: 'blur(4px)'
+    }),
   };
+
+  // Message appear variants
+  const messageVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.9 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1,
+    },
+    exit: { opacity: 0, scale: 0.9 }
+  } as const;
 
   return (
     <div ref={ref} className="h-full flex flex-col bg-surface-overlay overflow-hidden">
@@ -1245,7 +1401,11 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ 
+              duration: 0.35, 
+              ease: [0.32, 0.72, 0, 1],
+              scale: { type: "spring", stiffness: 300, damping: 30 }
+            }}
             className="absolute inset-0 overflow-y-auto p-4 space-y-3"
           >
             {/* Media preview */}
@@ -1274,18 +1434,31 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
               </motion.div>
             )}
 
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="max-w-[85%]">
-              <div className="bg-card rounded-2xl rounded-tl-md px-4 py-3 shadow-sm min-h-[40px]">
-                <div className="text-sm text-foreground">
-                  {parseMarkdown(displayedText || interpolatedMessage || '')}
-                  {displayedText && !isComplete && (
-                    <motion.span animate={{ opacity: [1, 0] }} transition={{ duration: 0.5, repeat: Infinity }} className="inline-block w-0.5 h-4 bg-primary ml-0.5 align-middle" />
-                  )}
+            <motion.div 
+              variants={messageVariants}
+              initial="hidden"
+              animate="visible"
+              className="max-w-[85%]"
+            >
+              <div className="bg-card rounded-2xl rounded-tl-md px-4 py-3 shadow-sm min-h-[40px] relative overflow-hidden">
+                {/* Subtle gradient overlay for depth */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+                <div className="text-sm text-foreground relative">
+                  <TypingMessage 
+                    text={interpolatedMessage || ''} 
+                    speed={22}
+                    showCursor={true}
+                  />
                 </div>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1 ml-2">
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-[10px] text-muted-foreground mt-1 ml-2"
+              >
                 {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-              </p>
+              </motion.p>
             </motion.div>
 
             <AnimatePresence>
@@ -1310,25 +1483,44 @@ export const BotPreview = forwardRef<HTMLDivElement, BotPreviewProps>(function B
                   }
                 }
                 
+                const isAIResponse = msg.text.includes('🤖') || msg.text.includes('AI:');
+                
                 return (
                   <motion.div 
                     key={msg.id} 
-                    initial={{ opacity: 0, y: 10 }} 
-                    animate={{ opacity: 1, y: 0 }} 
-                    exit={{ opacity: 0 }} 
-                    transition={{ delay: index * 0.05 }} 
+                    variants={messageVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
                     className={`max-w-[85%] ${msg.type === 'user' ? 'ml-auto' : ''}`}
                   >
-                    <div className={`rounded-2xl px-4 py-3 shadow-sm ${
+                    <div className={`rounded-2xl px-4 py-3 shadow-sm relative overflow-hidden ${
                       msg.type === 'user' 
                         ? 'bg-primary text-primary-foreground rounded-tr-md' 
-                        : 'bg-card rounded-tl-md'
+                        : isAIResponse
+                          ? 'bg-gradient-to-br from-fuchsia-500/10 to-violet-500/10 border border-fuchsia-500/20 rounded-tl-md'
+                          : 'bg-card rounded-tl-md'
                     }`}>
-                      <div className="text-sm">{parseMarkdown(msg.text)}</div>
+                      {/* Subtle shine effect */}
+                      <motion.div 
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                        initial={{ x: '-100%' }}
+                        animate={{ x: '200%' }}
+                        transition={{ duration: 1.5, delay: 0.2 }}
+                      />
+                      <div className="text-sm relative flex items-start gap-2">
+                        {isAIResponse && <Sparkles className="w-3.5 h-3.5 text-fuchsia-500 flex-shrink-0 mt-0.5" />}
+                        <span>{parseMarkdown(msg.text)}</span>
+                      </div>
                     </div>
-                    <p className={`text-[10px] text-muted-foreground mt-1 ${msg.type === 'user' ? 'mr-2 text-right' : 'ml-2'}`}>
+                    <motion.p 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className={`text-[10px] text-muted-foreground mt-1 ${msg.type === 'user' ? 'mr-2 text-right' : 'ml-2'}`}
+                    >
                       {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    </motion.p>
                   </motion.div>
                 );
               })}

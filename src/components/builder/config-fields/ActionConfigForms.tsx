@@ -1,9 +1,12 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { 
   MessageSquare, Clock, ArrowRight, Link, Edit3, Tag, GitBranch, 
   ShoppingCart, Trophy, Bell, Send, HelpCircle, Star, Package,
-  Users, Search, Timer, Target, Gift, Shield, CheckCircle, Hash, Trash2
+  Users, Search, Timer, Target, Gift, Shield, CheckCircle, Hash, Trash2,
+  Play, Loader2, CheckCircle2, XCircle, Copy, Sparkles
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import { ActionType, BotMenu } from '@/types/bot';
 import { 
   ConfigField, 
@@ -3015,11 +3018,107 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
 
     // AI Response
     case 'ai_response':
+      const AI_PROMPT_TEMPLATES = [
+        {
+          id: 'seller',
+          name: '🛒 Продавец',
+          description: 'Помогает с покупками и консультирует',
+          prompt: `Ты — опытный консультант интернет-магазина. Твоя задача:
+- Помогать клиентам с выбором товаров
+- Отвечать на вопросы о характеристиках, ценах, доставке
+- Быть вежливым и профессиональным
+- Предлагать дополнительные товары, когда это уместно
+- Убеждать, но не навязывать
+
+Стиль: дружелюбный, профессиональный, без лишней воды.
+Если не знаешь ответ — честно скажи и предложи связаться с менеджером.`
+        },
+        {
+          id: 'support',
+          name: '🎧 Поддержка',
+          description: 'Решает проблемы и отвечает на вопросы',
+          prompt: `Ты — специалист службы поддержки. Твоя задача:
+- Помогать пользователям решать проблемы
+- Объяснять сложные вещи простым языком
+- Быть терпеливым и понимающим
+- Давать пошаговые инструкции
+- Извиняться за неудобства, когда это уместно
+
+Стиль: спокойный, профессиональный, эмпатичный.
+Всегда спрашивай, решена ли проблема, и чем ещё можешь помочь.`
+        },
+        {
+          id: 'informer',
+          name: '📚 Информатор',
+          description: 'Предоставляет информацию и факты',
+          prompt: `Ты — информационный ассистент. Твоя задача:
+- Давать точную и полезную информацию
+- Отвечать кратко и по существу
+- Структурировать ответы для удобного чтения
+- Использовать списки и пункты
+- Указывать на важные детали
+
+Стиль: нейтральный, информативный, без эмоций.
+Если информация может быть устаревшей — предупреди об этом.`
+        },
+        {
+          id: 'friend',
+          name: '😊 Друг',
+          description: 'Неформальное общение',
+          prompt: `Ты — дружелюбный собеседник. Твоя задача:
+- Общаться неформально и тепло
+- Использовать эмодзи где уместно
+- Шутить и поддерживать позитивный настрой
+- Проявлять интерес к собеседнику
+- Быть понимающим и поддерживающим
+
+Стиль: дружеский, тёплый, с юмором.
+Не будь навязчивым, уважай личные границы.`
+        },
+        {
+          id: 'expert',
+          name: '🎓 Эксперт',
+          description: 'Глубокие знания в области',
+          prompt: `Ты — эксперт в своей области. Твоя задача:
+- Давать профессиональные и глубокие ответы
+- Объяснять концепции и терминологию
+- Приводить примеры и аналогии
+- Ссылаться на best practices
+- Предостерегать от типичных ошибок
+
+Стиль: экспертный, но доступный для понимания.
+Если вопрос выходит за рамки твоей экспертизы — честно скажи об этом.`
+        }
+      ];
+
       return (
         <div className="space-y-4">
           <ConfigInfo type="info">
             Бот использует ИИ для генерации ответа на основе контекста разговора.
           </ConfigInfo>
+
+          {/* Шаблоны промптов */}
+          <ConfigField
+            label="Готовые шаблоны"
+            description="Выберите роль для ИИ-ассистента"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              {AI_PROMPT_TEMPLATES.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => updateConfig('systemPrompt', template.prompt)}
+                  className={`p-3 rounded-lg border text-left transition-all hover:scale-[1.02] ${
+                    config.systemPrompt === template.prompt
+                      ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                      : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="font-medium text-sm">{template.name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{template.description}</div>
+                </button>
+              ))}
+            </div>
+          </ConfigField>
 
           <ConfigField
             label="Системный промпт"
@@ -3027,12 +3126,26 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
             example="Ты — дружелюбный ассистент магазина..."
             required
           >
-            <textarea
-              value={config.systemPrompt || ''}
-              onChange={(e) => updateConfig('systemPrompt', e.target.value)}
-              placeholder="Ты — полезный ассистент. Отвечай кратко и по делу."
-              className="w-full min-h-[100px] rounded-lg border border-border bg-background px-3 py-2 text-sm resize-y"
-            />
+            <div className="relative">
+              <textarea
+                value={config.systemPrompt || ''}
+                onChange={(e) => updateConfig('systemPrompt', e.target.value)}
+                placeholder="Ты — полезный ассистент. Отвечай кратко и по делу."
+                className="w-full min-h-[120px] rounded-lg border border-border bg-background px-3 py-2 text-sm resize-y pr-10"
+              />
+              {config.systemPrompt && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(config.systemPrompt);
+                    toast({ title: 'Скопировано!', description: 'Промпт скопирован в буфер обмена' });
+                  }}
+                  className="absolute top-2 right-2 p-1.5 rounded-md hover:bg-muted transition-colors"
+                  title="Скопировать промпт"
+                >
+                  <Copy className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
           </ConfigField>
 
           <ConfigField
@@ -3043,9 +3156,9 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
               value={config.model || 'gemini-flash'}
               onChange={(v) => updateConfig('model', v)}
               options={[
-                { value: 'gemini-flash', label: 'Gemini Flash', description: 'Быстрый, для простых задач' },
-                { value: 'gemini-pro', label: 'Gemini Pro', description: 'Умнее, для сложных задач' },
-                { value: 'gpt-4', label: 'GPT-4', description: 'Самый умный' },
+                { value: 'gemini-flash', label: '⚡ Gemini Flash', description: 'Быстрый, для простых задач' },
+                { value: 'gemini-pro', label: '🧠 Gemini Pro', description: 'Умнее, для сложных задач' },
+                { value: 'gpt-4', label: '🚀 GPT-4', description: 'Самый умный' },
               ]}
             />
           </ConfigField>
@@ -3072,12 +3185,20 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
             onChange={(v) => updateConfig('includeHistory', v)}
             label="Учитывать историю"
             description="Передавать предыдущие сообщения для контекста"
+            icon={<Sparkles className="w-4 h-4" />}
           />
+
+          <ConfigInfo type="tip">
+            Хороший промпт включает: роль ИИ, стиль общения, что можно/нельзя делать, примеры ответов.
+          </ConfigInfo>
         </div>
       );
 
     // HTTP Request
     case 'http_request':
+      // Import HttpTestPanel dynamically to avoid circular deps
+      const HttpTestPanelLazy = require('./HttpTestPanel').HttpTestPanel;
+      
       return (
         <div className="space-y-4">
           <ConfigInfo type="warning">
@@ -3101,16 +3222,24 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
             label="Метод запроса"
             description="Тип HTTP запроса"
           >
-            <ConfigSelect
-              value={config.method || 'GET'}
-              onChange={(v) => updateConfig('method', v)}
-              options={[
-                { value: 'GET', label: 'GET', description: 'Получить данные' },
-                { value: 'POST', label: 'POST', description: 'Отправить данные' },
-                { value: 'PUT', label: 'PUT', description: 'Обновить данные' },
-                { value: 'DELETE', label: 'DELETE', description: 'Удалить данные' },
-              ]}
-            />
+            <div className="flex gap-1">
+              {['GET', 'POST', 'PUT', 'DELETE'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => updateConfig('method', m)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    (config.method || 'GET') === m
+                      ? m === 'GET' ? 'bg-green-500/20 text-green-500 ring-1 ring-green-500/50' :
+                        m === 'POST' ? 'bg-blue-500/20 text-blue-500 ring-1 ring-blue-500/50' :
+                        m === 'PUT' ? 'bg-amber-500/20 text-amber-500 ring-1 ring-amber-500/50' :
+                        'bg-red-500/20 text-red-500 ring-1 ring-red-500/50'
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
           </ConfigField>
 
           <ConfigField
@@ -3126,17 +3255,19 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
             />
           </ConfigField>
 
-          <ConfigField
-            label="Тело запроса (JSON)"
-            description="Данные для отправки (POST/PUT)"
-          >
-            <textarea
-              value={config.body || ''}
-              onChange={(e) => updateConfig('body', e.target.value)}
-              placeholder='{"key": "value"}'
-              className="w-full min-h-[80px] rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono resize-y"
-            />
-          </ConfigField>
+          {(config.method === 'POST' || config.method === 'PUT' || config.method === 'PATCH') && (
+            <ConfigField
+              label="Тело запроса (JSON)"
+              description="Данные для отправки"
+            >
+              <textarea
+                value={config.body || ''}
+                onChange={(e) => updateConfig('body', e.target.value)}
+                placeholder='{"key": "value"}'
+                className="w-full min-h-[80px] rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono resize-y"
+              />
+            </ConfigField>
+          )}
 
           <ConfigField
             label="Сохранить результат в"
@@ -3158,8 +3289,26 @@ export function ActionConfigForms({ actionType, config, menus, updateConfig }: A
               onChange={(v) => updateConfig('timeout', v)}
               min={5}
               max={120}
+              presets={[
+                { value: 10, label: '10 сек' },
+                { value: 30, label: '30 сек' },
+                { value: 60, label: '1 мин' },
+              ]}
             />
-      </ConfigField>
+          </ConfigField>
+
+          {/* HTTP Test Panel */}
+          <HttpTestPanelLazy
+            url={config.url || ''}
+            method={config.method || 'GET'}
+            headers={config.headers}
+            body={config.body}
+            timeout={config.timeout || 30}
+          />
+
+          <ConfigInfo type="tip">
+            Используйте {'{переменные}'} в URL, заголовках и теле запроса для подстановки данных пользователя.
+          </ConfigInfo>
         </div>
       );
 
